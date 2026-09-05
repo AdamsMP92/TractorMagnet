@@ -97,3 +97,9 @@ landscapes, a combined overview, and an `equilibria.csv` comparison to
 The tables describe the 5 mm constituent magnets. Following Sec. III and the
 supplied MATLAB calculation, the interaction model uses two-magnet stacks with
 an effective height of 10 mm.
+
+The `production-line-animation` task samples 200 MPEX4 configurations along
+the practically stable part of the fitted production line. It writes an MP4
+with a fixed spatial domain and energy scale, plus a CSV containing the design
+coordinates and stability diagnostics for every frame. Use, for example,
+`pixi run production-line-animation --frames 200`.

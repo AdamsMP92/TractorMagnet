@@ -11,6 +11,7 @@ numpy = ">=2.0,<3"
 scipy = ">=1.14,<2"
 sympy = ">=1.13,<2"
 matplotlib = ">=3.9,<4"
+ffmpeg = ">=7,<9"
 
 [activation.env]
 PYTHONPATH = "$PIXI_PROJECT_ROOT/src"
@@ -28,6 +29,7 @@ format = "ruff format src tests scripts"
 figure-5 = "python scripts/reproduce_figure_5.py"
 figure-4 = "python scripts/reproduce_figure_4.py"
 supplementary-landscapes = "python scripts/reproduce_supplementary_landscapes.py"
+production-line-animation = "python scripts/animate_production_line_landscape.py"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
