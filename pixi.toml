@@ -1,0 +1,33 @@
+[workspace]
+name = "tractor-magnet"
+version = "0.1.0"
+description = "Reproducible calculations for two-dimensional tractor magnets"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[dependencies]
+python = ">=3.12,<3.13"
+numpy = ">=2.0,<3"
+scipy = ">=1.14,<2"
+sympy = ">=1.13,<2"
+matplotlib = ">=3.9,<4"
+
+[activation.env]
+PYTHONPATH = "$PIXI_PROJECT_ROOT/src"
+MPLCONFIGDIR = "$PIXI_PROJECT_ROOT/.pixi/matplotlib"
+
+[feature.dev.dependencies]
+pytest = ">=8,<10"
+pytest-cov = ">=6,<8"
+ruff = ">=0.9,<1"
+
+[feature.dev.tasks]
+test = "pytest"
+lint = "ruff check src tests scripts"
+format = "ruff format src tests scripts"
+figure-5 = "python scripts/reproduce_figure_5.py"
+figure-4 = "python scripts/reproduce_figure_4.py"
+supplementary-landscapes = "python scripts/reproduce_supplementary_landscapes.py"
+
+[environments]
+default = { features = ["dev"], solve-group = "default" }
