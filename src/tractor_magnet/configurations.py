@@ -45,8 +45,8 @@ def article_minimal_configuration(
     5 mm magnets. The overall polarity convention follows Appendix A.
     """
 
-    if a <= 0.0 or b <= 0.0:
-        raise ValueError("a and b must be positive")
+    if a < 0.0 or b <= 0.0:
+        raise ValueError("a must be non-negative and b must be positive")
 
     follower = CylinderMagnet(
         radius=7.5 * MILLIMETRE,
@@ -92,8 +92,8 @@ def minimal_configuration(
     this constructor is also useful outside the article's material choices.
     """
 
-    if a <= 0.0 or b <= 0.0:
-        raise ValueError("a and b must be positive")
+    if a < 0.0 or b <= 0.0:
+        raise ValueError("a must be non-negative and b must be positive")
 
     return PlanarConfiguration(
         follower=follower,

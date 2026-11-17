@@ -325,8 +325,8 @@ def evaluate_stability_point(
     recipe in Sec. II of the article.
     """
 
-    if a <= 0.0 or b <= 0.0:
-        raise ValueError("a and b must be positive")
+    if a < 0.0 or b <= 0.0:
+        raise ValueError("a must be non-negative and b must be positive")
     if axial_samples < 3 or barrier_samples < 3:
         raise ValueError("sample counts must be at least three")
 
@@ -459,8 +459,8 @@ def compute_stability_map(
     b_array = np.asarray(b_values, dtype=float)
     if a_array.ndim != 1 or b_array.ndim != 1 or not a_array.size or not b_array.size:
         raise ValueError("a_values and b_values must be non-empty one-dimensional arrays")
-    if np.any(a_array <= 0.0) or np.any(b_array <= 0.0):
-        raise ValueError("geometry coordinates must be positive")
+    if np.any(a_array < 0.0) or np.any(b_array <= 0.0):
+        raise ValueError("a coordinates must be non-negative and b coordinates positive")
 
     shape = (b_array.size, a_array.size)
     names = (

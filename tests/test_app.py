@@ -1,31 +1,6 @@
 from shiny import App
 
-from app import _geometry_diagram, app, input_panel, method_panel
-from web_support import WebInputs
-
-
-def _inputs() -> WebInputs:
-    return WebInputs.from_millimetres(
-        follower_radius_mm=7.5,
-        follower_height_mm=10.0,
-        follower_remanence_t=1.3,
-        attractor_radius_mm=7.5,
-        attractor_height_mm=10.0,
-        attractor_remanence_t=1.3,
-        repulsor_radius_mm=5.0,
-        repulsor_height_mm=10.0,
-        repulsor_remanence_t=0.39,
-        a_min_mm=9.0,
-        a_max_mm=19.0,
-        b_min_mm=4.0,
-        b_max_mm=14.0,
-        design_a_mm=14.0,
-        design_b_mm=12.0,
-        grid_points=11,
-        refinement_order=4,
-        friction_threshold_mn=10.0,
-        centering_tolerance_mm=1.25,
-    )
+from app import app, calculator_panel, input_panel, method_panel
 
 
 def test_shiny_app_constructs_with_staged_controls() -> None:
@@ -34,7 +9,12 @@ def test_shiny_app_constructs_with_staged_controls() -> None:
     assert "MPEX0" in html
     assert "MPEX2" in html
     assert "MPEX4" in html
+    assert "101 × 101" in html
     assert "Barrier threshold" in html
+    assert "Selected a" not in html
+    assert "a min [mm]" not in html
+    assert "b min [mm]" not in html
+    assert "derived_map_bounds" not in html
 
 
 def test_method_panel_states_necessary_condition_and_full_mask() -> None:
@@ -44,10 +24,8 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
     assert "three force barriers" in html
 
 
-def test_geometry_diagram_contains_all_magnets_and_dimensions() -> None:
-    diagram = _geometry_diagram(_inputs())
-    assert diagram.count('class="magnet repulsor"') == 2
-    assert 'class="magnet attractor"' in diagram
-    assert 'class="magnet follower"' in diagram
-    assert "a = 14.00 mm" in diagram
-    assert "b = 12.00 mm" in diagram
+def test_standard_output_has_only_the_chi_map() -> None:
+    html = str(calculator_panel)
+    assert "χ map and zero contour" in html
+    assert "Selected design point" not in html
+    assert "geometry_diagram" not in html

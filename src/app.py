@@ -63,74 +63,11 @@ def _format(value: float, digits: int = 3) -> str:
     return f"{value:.{digits}g}" if math.isfinite(value) else "—"
 
 
-def _geometry_diagram(inputs: WebInputs) -> str:
-    """Return a compact plan-view SVG of the selected minimal geometry."""
-
-    a = inputs.design_a_m / MILLIMETRE
-    b = inputs.design_b_m / MILLIMETRE
-    rf = inputs.follower_radius_m / MILLIMETRE
-    ra = inputs.attractor_radius_m / MILLIMETRE
-    rr = inputs.repulsor_radius_m / MILLIMETRE
-    extent = max(a + ra, b + rr, rf, 1.0)
-    scale = 142.0 / extent
-    origin_x = 220.0
-    origin_y = 180.0
-
-    def circle(x: float, y: float, radius: float, css: str, label: str) -> str:
-        return (
-            f'<circle cx="{origin_x + x * scale:.3f}" cy="{origin_y - y * scale:.3f}" '
-            f'r="{radius * scale:.3f}" class="{css}"/>'
-            f'<text x="{origin_x + x * scale:.3f}" y="{origin_y - y * scale + 4:.3f}" '
-            f'text-anchor="middle" class="magnet-label">{label}</text>'
-        )
-
-    return f"""
-    <svg class="geometry-svg" viewBox="0 0 440 360" role="img"
-         aria-labelledby="geometry-title geometry-desc">
-      <title id="geometry-title">Minimal tractor-magnet configuration</title>
-      <desc id="geometry-desc">One movable follower, one attractor, and a symmetric
-      pair of repulsors in plan view.</desc>
-      <defs>
-        <marker id="arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5"
-                orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#718096"/></marker>
-      </defs>
-      <line x1="36" y1="{origin_y:.2f}" x2="404" y2="{origin_y:.2f}" class="axis-line"
-            marker-end="url(#arrow)"/>
-      <line x1="{origin_x:.2f}" y1="326" x2="{origin_x:.2f}" y2="34" class="axis-line"
-            marker-end="url(#arrow)"/>
-      <text x="407" y="{origin_y - 7:.2f}" class="axis-label">x</text>
-      <text x="{origin_x + 8:.2f}" y="31" class="axis-label">y</text>
-      <line x1="{origin_x - a * scale:.3f}" y1="{origin_y + 24:.3f}"
-            x2="{origin_x:.3f}" y2="{origin_y + 24:.3f}" class="dimension-line"/>
-      <text x="{origin_x - 0.5 * a * scale:.3f}" y="{origin_y + 42:.3f}"
-            text-anchor="middle" class="dimension-label">a = {a:.2f} mm</text>
-      <line x1="{origin_x + 28:.3f}" y1="{origin_y:.3f}"
-            x2="{origin_x + 28:.3f}" y2="{origin_y - b * scale:.3f}" class="dimension-line"/>
-      <text x="{origin_x + 37:.3f}" y="{origin_y - 0.5 * b * scale:.3f}"
-            class="dimension-label">b = {b:.2f} mm</text>
-      {circle(-a, 0.0, ra, "magnet attractor", "A")}
-      {circle(0.0, b, rr, "magnet repulsor", "R")}
-      {circle(0.0, -b, rr, "magnet repulsor", "R")}
-      {circle(0.0, 0.0, rf, "magnet follower", "F")}
-      <text x="18" y="22" class="svg-kicker">PLAN VIEW · INPUT GEOMETRY</text>
-      <g transform="translate(20,330)">
-        <circle cx="6" cy="0" r="6" class="legend-dot follower"/>
-        <text x="17" y="4" class="legend">movable</text>
-        <circle cx="105" cy="0" r="6" class="legend-dot attractor"/>
-        <text x="116" y="4" class="legend">attracting</text>
-        <circle cx="222" cy="0" r="6" class="legend-dot repulsor"/>
-        <text x="233" y="4" class="legend">repelling pair</text>
-      </g>
-    </svg>
-    """
-
-
 def _plot_map(
     axis: plt.Axes,
     stability_map: StabilityMap,
     *,
     title: str,
-    design: tuple[float, float],
     norm: Normalize,
 ) -> object:
     a_mm = stability_map.a_values / MILLIMETRE
@@ -195,8 +132,6 @@ def _plot_map(
             color="#172033",
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78},
         )
-    axis.scatter(*design, marker="x", s=68, linewidth=3.4, color="white", zorder=5)
-    axis.scatter(*design, marker="x", s=55, linewidth=1.7, color="#172033", zorder=6)
     axis.set(title=title, xlabel="a [mm]", ylabel="b [mm]")
     axis.set_aspect("equal", adjustable="box")
     return image
@@ -204,10 +139,6 @@ def _plot_map(
 
 def _stability_figure(calculation: WebCalculation):
     figure, axis = plt.subplots(1, 1, figsize=(7.2, 5.8))
-    design = (
-        calculation.inputs.design_a_m / MILLIMETRE,
-        calculation.inputs.design_b_m / MILLIMETRE,
-    )
     finite_values = calculation.refined_map.chi[np.isfinite(calculation.refined_map.chi)]
     if finite_values.size:
         centre = float(np.nanmedian(finite_values))
@@ -219,7 +150,6 @@ def _stability_figure(calculation: WebCalculation):
         axis,
         calculation.refined_map,
         title=f"MPEX{calculation.inputs.refinement_order} curvature-symmetry map",
-        design=design,
         norm=norm,
     )
     figure.suptitle(
@@ -313,7 +243,7 @@ input_panel = ui.div(
             "repulsor_radius",
             "Radius [mm]",
             5.0,
-            minimum=0.1,
+            minimum=1.0,
             maximum=30,
             step=0.1,
             note="Fixed at (0, ±b)",
@@ -341,15 +271,6 @@ input_panel = ui.div(
     _input_section("04", "Map and model"),
     ui.div(
         _field(
-            "a_min",
-            "a min [mm]",
-            9.0,
-            minimum=0.2,
-            maximum=80,
-            step=0.5,
-            note="Horizontal map limit",
-        ),
-        _field(
             "a_max",
             "a max [mm]",
             19.0,
@@ -357,12 +278,6 @@ input_panel = ui.div(
             maximum=80,
             step=0.5,
             note="Horizontal map limit",
-        ),
-        class_="input-pair",
-    ),
-    ui.div(
-        _field(
-            "b_min", "b min [mm]", 4.0, minimum=0.2, maximum=80, step=0.5, note="Vertical map limit"
         ),
         _field(
             "b_max",
@@ -372,27 +287,6 @@ input_panel = ui.div(
             maximum=80,
             step=0.5,
             note="Vertical map limit",
-        ),
-        class_="input-pair",
-    ),
-    ui.div(
-        _field(
-            "design_a",
-            "Selected a [mm]",
-            14.0,
-            minimum=0.2,
-            maximum=80,
-            step=0.1,
-            note="Selected design marker",
-        ),
-        _field(
-            "design_b",
-            "Selected b [mm]",
-            12.0,
-            minimum=0.2,
-            maximum=80,
-            step=0.1,
-            note="Selected design marker",
         ),
         class_="input-pair",
     ),
@@ -411,10 +305,23 @@ input_panel = ui.div(
             ui.input_select(
                 "grid_points",
                 "Grid per axis",
-                {"15": "15 × 15", "21": "21 × 21", "31": "31 × 31", "41": "41 × 41"},
+                {
+                    "15": "15 × 15",
+                    "21": "21 × 21",
+                    "31": "31 × 31",
+                    "41": "41 × 41",
+                    "51": "51 × 51",
+                    "61": "61 × 61",
+                    "71": "71 × 71",
+                    "81": "81 × 81",
+                    "101": "101 × 101",
+                },
                 selected="21",
             ),
-            ui.tags.small("Higher grids take longer in-browser", class_="field-note"),
+            ui.tags.small(
+                "MPEX4 runtime grows approximately with the number of grid points",
+                class_="field-note",
+            ),
             class_="field-block",
         ),
         class_="input-pair",
@@ -467,15 +374,6 @@ calculator_panel = ui.div(
             ),
             ui.output_plot("stability_plot", height="470px"),
             class_="visual-card map-card",
-        ),
-        ui.div(
-            ui.div(
-                ui.tags.span("GEOMETRY", class_="eyebrow"),
-                ui.h3("Selected design point"),
-                class_="card-title-group",
-            ),
-            ui.output_ui("geometry_diagram"),
-            class_="visual-card geometry-card",
         ),
         class_="calculator-results",
     ),
@@ -632,12 +530,8 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             repulsor_radius_mm=input.repulsor_radius(),
             repulsor_height_mm=input.repulsor_height(),
             repulsor_remanence_t=input.repulsor_remanence(),
-            a_min_mm=input.a_min(),
             a_max_mm=input.a_max(),
-            b_min_mm=input.b_min(),
             b_max_mm=input.b_max(),
-            design_a_mm=input.design_a(),
-            design_b_mm=input.design_b(),
             grid_points=int(input.grid_points()),
             refinement_order=int(input.order()),
             friction_threshold_mn=input.friction(),
@@ -694,13 +588,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     @render.ui
     def summary_cards() -> ui.Tag:
         value = result()
-        point = value.refined_point
-        minimum_barrier = min(
-            point.negative_x_barrier,
-            point.positive_x_barrier,
-            point.transverse_barrier,
-        )
-        stable = point.passes_friction_threshold and point.passes_centering_tolerance
         return ui.div(
             _metric_card(
                 "Moment ratio η",
@@ -710,35 +597,18 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 "teal" if value.inputs.passes_moment_condition else "red",
             ),
             _metric_card(
-                "Selected design",
-                "stable" if stable else "not stable",
+                "Approximation",
+                f"MPEX{value.inputs.refinement_order}",
                 "",
-                f"MPEX{value.inputs.refinement_order} practical criteria",
-                "teal" if stable else "copper",
-            ),
-            _metric_card(
-                "Equilibrium x",
-                _format(point.equilibrium_x / MILLIMETRE),
-                "mm",
-                "rightmost planar minimum",
+                "finite-size refinement order",
                 "indigo",
             ),
             _metric_card(
-                "χ", _format(point.chi), "", "curvature symmetry, not stability alone", "indigo"
-            ),
-            _metric_card(
-                "Weakest barrier",
-                _format(minimum_barrier * 1.0e3),
-                "mN",
-                f"threshold {value.inputs.friction_threshold_n * 1e3:g} mN",
+                "Grid",
+                f"{value.inputs.grid_points} × {value.inputs.grid_points}",
+                "",
+                f"calculated in {value.elapsed_s:.2f} s",
                 "copper",
-            ),
-            _metric_card(
-                "Stable map area",
-                _format(100.0 * value.refined_stable_fraction),
-                "%",
-                "fraction of sampled rectangle",
-                "teal",
             ),
             class_="metrics-grid",
         )
@@ -747,11 +617,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     @render.plot
     def stability_plot():
         return _stability_figure(result())
-
-    @output
-    @render.ui
-    def geometry_diagram() -> ui.Tag:
-        return ui.HTML(_geometry_diagram(result().inputs))
 
 
 app = App(app_ui, server, static_assets=APP_DIR / "www")

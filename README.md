@@ -107,6 +107,9 @@ coordinates and stability diagnostics for every frame. Use, for example,
 
 ## Browser app
 
+The deployed app is available at
+<https://adamsmp92.github.io/TractorMagnet/>.
+
 The browser-native Shiny interface follows the same deployment pattern as the
 other scientific apps at <https://adamsmp92.github.io/homepage/software/>. It
 provides a staged design analysis for arbitrary cylindrical follower,
@@ -121,7 +124,12 @@ core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
 force-barrier thresholds, and transverse centering tolerance. The `chi` map is
 therefore not presented as a stand-alone stability test.
 
+The lower map limits follow directly from the fixed-magnet geometry. The
+`a` limit is taken from the collision circle at 90 degrees, measured from the
+positive `a` axis, and is therefore `a_min = 0`. This deliberately keeps the
+grey geometric-exclusion region visible in the map. The geometric `b_min` is
+the repulsor radius and is rounded down to a whole millimetre.
+
 Run the app locally with `pixi run app` and export the static GitHub Pages
 bundle with `pixi run export-site`. All numerical work then runs in the
 visitor's browser; no simulation server is required.
-Web application link: <https://adamsmp92.github.io/TractorMagnet/>

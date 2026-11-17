@@ -20,12 +20,8 @@ def _inputs(**overrides) -> WebInputs:
         "repulsor_radius_mm": 5.0,
         "repulsor_height_mm": 10.0,
         "repulsor_remanence_t": 0.39,
-        "a_min_mm": 9.0,
         "a_max_mm": 19.0,
-        "b_min_mm": 4.0,
         "b_max_mm": 14.0,
-        "design_a_mm": 14.0,
-        "design_b_mm": 12.0,
         "grid_points": 11,
         "refinement_order": 0,
         "friction_threshold_mn": 10.0,
@@ -43,6 +39,18 @@ def test_web_inputs_reproduce_article_moment_ratio() -> None:
     assert inputs.follower.polarity == 1
     assert inputs.attractor.polarity == -1
     assert inputs.repulsor.polarity == 1
+    assert inputs.a_min_m / MILLIMETRE == pytest.approx(0.0)
+    assert inputs.b_min_m / MILLIMETRE == pytest.approx(5.0)
+
+
+def test_map_minima_follow_geometry_and_rounding_rules() -> None:
+    inputs = _inputs(attractor_radius_mm=6.2, repulsor_radius_mm=5.9)
+
+    assert inputs.a_min_m / MILLIMETRE == pytest.approx(0.0)
+    assert inputs.b_min_m / MILLIMETRE == pytest.approx(5.0)
+    assert math.hypot(inputs.a_min_m, inputs.b_min_m) < (
+        inputs.attractor_radius_m + inputs.repulsor_radius_m
+    )
 
 
 def test_custom_minimal_configuration_and_overlap_rule() -> None:
@@ -74,18 +82,19 @@ def test_small_web_calculation_reuses_dipole_result_for_order_zero() -> None:
     calculation = calculate_web(_inputs())
 
     assert calculation.refined_map is calculation.dipole_map
-    assert calculation.refined_point is calculation.dipole_point
     assert calculation.dipole_map.chi.shape == (11, 11)
     assert math.isfinite(calculation.elapsed_s)
-    assert 0.0 <= calculation.refined_stable_fraction <= 1.0
     assert np.array_equal(
         calculation.refined_map.geometry_forbidden,
         calculation.dipole_map.geometry_forbidden,
     )
+    assert calculation.dipole_map.geometry_forbidden[:, 0].any()
 
 
-def test_web_validation_rejects_unsupported_order_and_outside_design() -> None:
+def test_web_validation_rejects_unsupported_order_and_invalid_map_limit() -> None:
     with pytest.raises(ValueError, match="multipole order"):
         _inputs(refinement_order=6)
-    with pytest.raises(ValueError, match="selected design a"):
-        _inputs(design_a_mm=20.0)
+    with pytest.raises(ValueError, match="minimum"):
+        _inputs(b_max_mm=4.0)
+    with pytest.raises(ValueError, match="between 11 and 101"):
+        _inputs(grid_points=102)
