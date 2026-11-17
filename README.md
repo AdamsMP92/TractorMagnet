@@ -124,3 +124,4 @@ therefore not presented as a stand-alone stability test.
 Run the app locally with `pixi run app` and export the static GitHub Pages
 bundle with `pixi run export-site`. All numerical work then runs in the
 visitor's browser; no simulation server is required.
+Web application link: <https://adamsmp92.github.io/TractorMagnet/>
