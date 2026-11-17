@@ -122,7 +122,9 @@ attractor, and repulsor magnets:
 The displayed practical-stability boundary retains the complete scientific
 core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
 force-barrier thresholds, and transverse centering tolerance. The `chi` map is
-therefore not presented as a stand-alone stability test.
+therefore not presented as a stand-alone stability test. As in the original
+Figure-4 reproduction, both the colored `chi` values and the zero contour are
+clipped to this practical-stability region.
 
 The lower map limits follow directly from the fixed-magnet geometry. The
 `a` limit is taken from the collision circle at 90 degrees, measured from the

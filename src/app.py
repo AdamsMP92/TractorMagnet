@@ -63,6 +63,15 @@ def _format(value: float, digits: int = 3) -> str:
     return f"{value:.{digits}g}" if math.isfinite(value) else "—"
 
 
+def _mask_to_practical_region(
+    stability_map: StabilityMap,
+    values: np.ndarray,
+) -> np.ma.MaskedArray:
+    """Apply the same practical-stability mask as the Figure-4 reproduction."""
+
+    return np.ma.masked_where(~stability_map.stable | ~np.isfinite(values), values)
+
+
 def _plot_map(
     axis: plt.Axes,
     stability_map: StabilityMap,
@@ -72,8 +81,7 @@ def _plot_map(
 ) -> object:
     a_mm = stability_map.a_values / MILLIMETRE
     b_mm = stability_map.b_values / MILLIMETRE
-    eligible = stability_map.has_local_minimum & ~stability_map.geometry_forbidden
-    values = np.ma.masked_where(~eligible | ~np.isfinite(stability_map.chi), stability_map.chi)
+    values = _mask_to_practical_region(stability_map, stability_map.chi)
     image = axis.pcolormesh(a_mm, b_mm, values, cmap="coolwarm", norm=norm, shading="auto")
     axis.contourf(
         a_mm,
@@ -100,10 +108,7 @@ def _plot_map(
             colors=("#172033",),
             linewidths=0.6,
         )
-    difference = np.ma.masked_where(
-        ~eligible | ~np.isfinite(stability_map.curvature_difference),
-        stability_map.curvature_difference,
-    )
+    difference = _mask_to_practical_region(stability_map, stability_map.curvature_difference)
     finite_difference = difference.compressed()
     if finite_difference.size and np.min(finite_difference) <= 0.0 <= np.max(finite_difference):
         axis.contour(
@@ -139,7 +144,9 @@ def _plot_map(
 
 def _stability_figure(calculation: WebCalculation):
     figure, axis = plt.subplots(1, 1, figsize=(7.2, 5.8))
-    finite_values = calculation.refined_map.chi[np.isfinite(calculation.refined_map.chi)]
+    finite_values = calculation.refined_map.chi[
+        calculation.refined_map.stable & np.isfinite(calculation.refined_map.chi)
+    ]
     if finite_values.size:
         centre = float(np.nanmedian(finite_values))
         spread = max(1.0, float(np.nanpercentile(abs(finite_values - centre), 95)))

@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
+import numpy as np
 from shiny import App
 
-from app import app, calculator_panel, input_panel, method_panel
+from app import _mask_to_practical_region, app, calculator_panel, input_panel, method_panel
 
 
 def test_shiny_app_constructs_with_staged_controls() -> None:
@@ -29,3 +32,15 @@ def test_standard_output_has_only_the_chi_map() -> None:
     assert "χ map and zero contour" in html
     assert "Selected design point" not in html
     assert "geometry_diagram" not in html
+
+
+def test_chi_map_uses_the_original_practical_stability_mask() -> None:
+    stability_map = SimpleNamespace(
+        stable=np.asarray(((True, False), (False, True)), dtype=bool)
+    )
+    values = np.asarray(((1.0, 2.0), (np.nan, 4.0)))
+
+    visible = _mask_to_practical_region(stability_map, values)
+
+    assert visible.mask.tolist() == [[False, True], [True, False]]
+    assert visible.compressed().tolist() == [1.0, 4.0]
