@@ -13,7 +13,9 @@ def test_shiny_app_constructs_with_staged_controls() -> None:
     assert "MPEX2" in html
     assert "MPEX4" in html
     assert "101 × 101" in html
-    assert "Barrier threshold" in html
+    assert "Physical friction criterion" in html
+    assert "Friction-force threshold" in html
+    assert html.index("Physical friction criterion") < html.index("Map and model")
     assert "Selected a" not in html
     assert "a min [mm]" not in html
     assert "b min [mm]" not in html

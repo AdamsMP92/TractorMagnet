@@ -275,7 +275,29 @@ input_panel = ui.div(
         step=0.01,
         note="Same polarity as follower",
     ),
-    _input_section("04", "Map and model"),
+    _input_section("04", "Physical friction criterion"),
+    ui.div(
+        _field(
+            "friction",
+            "Friction-force threshold [mN]",
+            10.0,
+            minimum=0.001,
+            maximum=1000,
+            step=1.0,
+            note="Physical static-friction scale",
+        ),
+        _field(
+            "centering",
+            "Centering tolerance [mm]",
+            1.25,
+            minimum=0.001,
+            maximum=30,
+            step=0.05,
+            note="Maximum half-width y₁₀ of the static-friction dead zone",
+        ),
+        class_="input-pair",
+    ),
+    _input_section("05", "Map and model"),
     ui.div(
         _field(
             "a_max",
@@ -330,27 +352,6 @@ input_panel = ui.div(
                 class_="field-note",
             ),
             class_="field-block",
-        ),
-        class_="input-pair",
-    ),
-    ui.div(
-        _field(
-            "friction",
-            "Barrier threshold [mN]",
-            10.0,
-            minimum=0.001,
-            maximum=1000,
-            step=1.0,
-            note="All three barriers must exceed it",
-        ),
-        _field(
-            "centering",
-            "Centering tolerance [mm]",
-            1.25,
-            minimum=0.001,
-            maximum=30,
-            step=0.05,
-            note="Maximum half-width y₁₀ of the static-friction dead zone",
         ),
         class_="input-pair",
     ),
@@ -437,7 +438,8 @@ method_panel = ui.div(
             ui.tags.p(
                 "A point is shown as practically stable only after overlap exclusion, "
                 "a positive planar Hessian, three force barriers, and the transverse "
-                "centering tolerance all pass."
+                "centering tolerance all pass. The friction-force threshold and "
+                "centering tolerance are physical parameters, not numerical map settings."
             ),
             class_="docs-section",
         ),
