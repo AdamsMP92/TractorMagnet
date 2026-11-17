@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from tractor_magnet.adaptive_map import compute_adaptive_stability_map
 from tractor_magnet.constants import MILLIMETRE
 from tractor_magnet.models import CylinderMagnet
-from tractor_magnet.stability_map import StabilityMap
+from tractor_magnet.stability_map import StabilityMap, SymmetryLineFit, fit_symmetry_line
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,13 +17,11 @@ class WebInputs:
     """Complete, hashable input state for one adaptive browser calculation."""
 
     follower_radius_m: float
-    follower_height_m: float
+    height_m: float
     follower_remanence_t: float
     attractor_radius_m: float
-    attractor_height_m: float
     attractor_remanence_t: float
     repulsor_radius_m: float
-    repulsor_height_m: float
     repulsor_remanence_t: float
     resolution_m: float
     friction_threshold_n: float = 10.0e-3
@@ -33,14 +31,12 @@ class WebInputs:
     def from_millimetres(
         cls,
         *,
+        height_mm: float,
         follower_radius_mm: float,
-        follower_height_mm: float,
         follower_remanence_t: float,
         attractor_radius_mm: float,
-        attractor_height_mm: float,
         attractor_remanence_t: float,
         repulsor_radius_mm: float,
-        repulsor_height_mm: float,
         repulsor_remanence_t: float,
         resolution_mm: float,
         friction_threshold_mn: float,
@@ -49,14 +45,12 @@ class WebInputs:
         """Construct validated SI inputs from the units shown by the app."""
 
         result = cls(
+            height_m=float(height_mm) * MILLIMETRE,
             follower_radius_m=float(follower_radius_mm) * MILLIMETRE,
-            follower_height_m=float(follower_height_mm) * MILLIMETRE,
             follower_remanence_t=float(follower_remanence_t),
             attractor_radius_m=float(attractor_radius_mm) * MILLIMETRE,
-            attractor_height_m=float(attractor_height_mm) * MILLIMETRE,
             attractor_remanence_t=float(attractor_remanence_t),
             repulsor_radius_m=float(repulsor_radius_mm) * MILLIMETRE,
-            repulsor_height_m=float(repulsor_height_mm) * MILLIMETRE,
             repulsor_remanence_t=float(repulsor_remanence_t),
             resolution_m=float(resolution_mm) * MILLIMETRE,
             friction_threshold_n=float(friction_threshold_mn) * 1.0e-3,
@@ -71,14 +65,12 @@ class WebInputs:
         values = {
             name: value
             for name, value in (
+                ("common magnet height", self.height_m),
                 ("follower radius", self.follower_radius_m),
-                ("follower height", self.follower_height_m),
                 ("follower remanence", self.follower_remanence_t),
                 ("attractor radius", self.attractor_radius_m),
-                ("attractor height", self.attractor_height_m),
                 ("attractor remanence", self.attractor_remanence_t),
                 ("repulsor radius", self.repulsor_radius_m),
-                ("repulsor height", self.repulsor_height_m),
                 ("repulsor remanence", self.repulsor_remanence_t),
                 ("resolution", self.resolution_m),
                 ("friction threshold", self.friction_threshold_n),
@@ -109,7 +101,7 @@ class WebInputs:
     def follower(self) -> CylinderMagnet:
         return CylinderMagnet(
             self.follower_radius_m,
-            self.follower_height_m,
+            self.height_m,
             self.follower_remanence_t,
             polarity=1,
         )
@@ -118,7 +110,7 @@ class WebInputs:
     def attractor(self) -> CylinderMagnet:
         return CylinderMagnet(
             self.attractor_radius_m,
-            self.attractor_height_m,
+            self.height_m,
             self.attractor_remanence_t,
             polarity=-1,
         )
@@ -127,7 +119,7 @@ class WebInputs:
     def repulsor(self) -> CylinderMagnet:
         return CylinderMagnet(
             self.repulsor_radius_m,
-            self.repulsor_height_m,
+            self.height_m,
             self.repulsor_remanence_t,
             polarity=1,
         )
@@ -155,6 +147,7 @@ class WebCalculation:
     evaluated_points: int
     full_grid_points: int
     scout_points: int
+    line_fit: SymmetryLineFit | None
     elapsed_s: float
 
 
@@ -171,6 +164,14 @@ def calculate_web(inputs: WebInputs) -> WebCalculation:
         attractor=inputs.attractor,
         repulsor=inputs.repulsor,
     )
+    try:
+        line_fit = fit_symmetry_line(
+            result.stability_map,
+            a_interval=None,
+            practical_only=True,
+        )
+    except ValueError:
+        line_fit = None
     return WebCalculation(
         inputs=inputs,
         refined_map=result.stability_map,
@@ -178,5 +179,6 @@ def calculate_web(inputs: WebInputs) -> WebCalculation:
         evaluated_points=result.evaluated_points,
         full_grid_points=result.full_grid_points,
         scout_points=result.scout_points,
+        line_fit=line_fit,
         elapsed_s=time.perf_counter() - started,
     )

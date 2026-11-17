@@ -12,14 +12,12 @@ from web_support import WebInputs, calculate_web
 
 def _inputs(**overrides) -> WebInputs:
     values = {
+        "height_mm": 10.0,
         "follower_radius_mm": 7.5,
-        "follower_height_mm": 10.0,
         "follower_remanence_t": 1.3,
         "attractor_radius_mm": 7.5,
-        "attractor_height_mm": 10.0,
         "attractor_remanence_t": 1.3,
         "repulsor_radius_mm": 5.0,
-        "repulsor_height_mm": 10.0,
         "repulsor_remanence_t": 0.39,
         "resolution_mm": 1.0,
         "friction_threshold_mn": 10.0,
@@ -37,6 +35,7 @@ def test_web_inputs_reproduce_article_moment_ratio() -> None:
     assert inputs.follower.polarity == 1
     assert inputs.attractor.polarity == -1
     assert inputs.repulsor.polarity == 1
+    assert inputs.follower.height == inputs.attractor.height == inputs.repulsor.height
     assert inputs.a_min_m / MILLIMETRE == pytest.approx(0.0)
     assert inputs.b_min_m / MILLIMETRE == pytest.approx(4.0)
 
@@ -81,6 +80,9 @@ def test_web_calculation_returns_an_adaptive_mpex4_map() -> None:
 
     assert calculation.refined_map.order == 4
     assert calculation.refined_map.stable.any()
+    assert calculation.line_fit is not None
+    assert calculation.line_fit.a_min < calculation.line_fit.a_max
+    assert calculation.line_fit.points >= 2
     assert math.isfinite(calculation.elapsed_s)
     assert calculation.evaluated_points < calculation.full_grid_points
     assert calculation.search_extent_m > calculation.refined_map.a_values[-1]

@@ -118,6 +118,8 @@ class SymmetryLineFit:
     intercept: float
     rms_residual: float
     points: int
+    a_min: float
+    a_max: float
 
 
 def geometry_is_forbidden(
@@ -541,11 +543,23 @@ def compute_stability_map(
     )
 
 
-def symmetry_line_points(stability_map: StabilityMap) -> NDArray[np.float64]:
-    """Interpolate sign changes of ``Hyy - Hxx`` along each b-column."""
+def symmetry_line_points(
+    stability_map: StabilityMap,
+    *,
+    practical_only: bool = False,
+) -> NDArray[np.float64]:
+    """Interpolate sign changes of ``Hyy - Hxx`` along each b-column.
+
+    With ``practical_only=True``, both samples bracketing a crossing must lie
+    inside the complete practical-stability mask.
+    """
 
     points: list[tuple[float, float]] = []
-    eligible = stability_map.has_local_minimum & ~stability_map.geometry_forbidden
+    eligible = (
+        stability_map.stable
+        if practical_only
+        else stability_map.has_local_minimum & ~stability_map.geometry_forbidden
+    )
     differences = stability_map.curvature_difference
 
     for column, a in enumerate(stability_map.a_values):
@@ -573,12 +587,16 @@ def symmetry_line_points(stability_map: StabilityMap) -> NDArray[np.float64]:
 def fit_symmetry_line(
     stability_map: StabilityMap,
     *,
-    a_interval: tuple[float, float] = (10.0e-3, 14.5e-3),
+    a_interval: tuple[float, float] | None = (10.0e-3, 14.5e-3),
+    practical_only: bool = False,
 ) -> SymmetryLineFit:
-    """Fit the symmetry contour over the interval used for Eq. (7)."""
+    """Fit the symmetry contour over a requested or automatically found interval."""
 
-    points = symmetry_line_points(stability_map)
-    selected = points[(points[:, 0] >= a_interval[0]) & (points[:, 0] <= a_interval[1])]
+    points = symmetry_line_points(stability_map, practical_only=practical_only)
+    if a_interval is None:
+        selected = points
+    else:
+        selected = points[(points[:, 0] >= a_interval[0]) & (points[:, 0] <= a_interval[1])]
     if selected.shape[0] < 2:
         raise ValueError("fewer than two symmetry-line points in the fit interval")
     slope, intercept = np.polyfit(selected[:, 0], selected[:, 1], deg=1)
@@ -589,4 +607,6 @@ def fit_symmetry_line(
         intercept=float(intercept),
         rms_residual=float(np.sqrt(np.mean(residuals**2))),
         points=int(selected.shape[0]),
+        a_min=float(np.min(selected[:, 0])),
+        a_max=float(np.max(selected[:, 0])),
     )

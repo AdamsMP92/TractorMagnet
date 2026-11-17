@@ -209,10 +209,20 @@ input_panel = ui.div(
     ui.tags.span("DESIGN INPUTS", class_="eyebrow"),
     ui.h2("Define the magnet set"),
     ui.tags.p(
-        "All cylinders are coaxially magnetized. Dimensions are diametric radii and heights.",
+        "All cylinders are coaxially magnetized and share one common height.",
         class_="panel-intro",
     ),
-    _input_section("01", "Follower"),
+    _input_section("01", "Common Magnet Geometry"),
+    _field(
+        "magnet_height",
+        "Height [mm]",
+        10.0,
+        minimum=0.1,
+        maximum=50,
+        step=0.1,
+        note="Shared by follower, attractor, and both repulsors",
+    ),
+    _input_section("02", "Follower Magnet"),
     ui.div(
         _field(
             "follower_radius",
@@ -224,26 +234,17 @@ input_panel = ui.div(
             note="Movable cylinder",
         ),
         _field(
-            "follower_height",
-            "Height [mm]",
-            10.0,
-            minimum=0.1,
-            maximum=50,
-            step=0.1,
-            note="Axial stack height",
+            "follower_remanence",
+            "Remanence Br [T]",
+            1.3,
+            minimum=0.001,
+            maximum=3,
+            step=0.01,
+            note="Positive model polarity",
         ),
         class_="input-pair",
     ),
-    _field(
-        "follower_remanence",
-        "Remanence Br [T]",
-        1.3,
-        minimum=0.001,
-        maximum=3,
-        step=0.01,
-        note="Positive model polarity",
-    ),
-    _input_section("02", "Attractor"),
+    _input_section("03", "Attractor Magnet"),
     ui.div(
         _field(
             "attractor_radius",
@@ -255,26 +256,17 @@ input_panel = ui.div(
             note="Fixed at (-a, 0)",
         ),
         _field(
-            "attractor_height",
-            "Height [mm]",
-            10.0,
-            minimum=0.1,
-            maximum=50,
-            step=0.1,
-            note="Axial stack height",
+            "attractor_remanence",
+            "Remanence Br [T]",
+            1.3,
+            minimum=0.001,
+            maximum=3,
+            step=0.01,
+            note="Opposite polarity to follower",
         ),
         class_="input-pair",
     ),
-    _field(
-        "attractor_remanence",
-        "Remanence Br [T]",
-        1.3,
-        minimum=0.001,
-        maximum=3,
-        step=0.01,
-        note="Opposite polarity to follower",
-    ),
-    _input_section("03", "Repulsor pair"),
+    _input_section("04", "Repulsor Magnet Pair"),
     ui.div(
         _field(
             "repulsor_radius",
@@ -286,26 +278,17 @@ input_panel = ui.div(
             note="Fixed at (0, ±b)",
         ),
         _field(
-            "repulsor_height",
-            "Height [mm]",
-            10.0,
-            minimum=0.1,
-            maximum=50,
-            step=0.1,
-            note="Both magnets identical",
+            "repulsor_remanence",
+            "Remanence Br [T]",
+            0.39,
+            minimum=0.001,
+            maximum=3,
+            step=0.01,
+            note="Same polarity as follower",
         ),
         class_="input-pair",
     ),
-    _field(
-        "repulsor_remanence",
-        "Remanence Br [T]",
-        0.39,
-        minimum=0.001,
-        maximum=3,
-        step=0.01,
-        note="Same polarity as follower",
-    ),
-    _input_section("04", "Physical friction criterion"),
+    _input_section("05", "Physical friction criterion"),
     ui.div(
         _field(
             "friction",
@@ -327,7 +310,7 @@ input_panel = ui.div(
         ),
         class_="input-pair",
     ),
-    _input_section("05", "Compute stability map"),
+    _input_section("06", "Compute stability map"),
     _field(
         "resolution",
         "Resolution [mm]",
@@ -352,6 +335,7 @@ calculator_panel = ui.div(
     ui.tags.main(
         ui.output_ui("calculation_message"),
         ui.output_ui("summary_cards"),
+        ui.output_ui("line_fit_summary"),
         ui.div(
             ui.div(
                 ui.div(
@@ -421,6 +405,16 @@ method_panel = ui.div(
                 "a positive planar Hessian, three force barriers, and the transverse "
                 "centering tolerance all pass. The friction-force threshold and "
                 "centering tolerance are physical parameters, not numerical map settings."
+            ),
+            class_="docs-section",
+        ),
+        ui.div(
+            ui.tags.span("05", class_="docs-number"),
+            ui.h3("Production-line fit"),
+            ui.tags.p(
+                "Inside the practical mask, zero crossings of Hyy − Hxx are interpolated "
+                "column by column. Their least-squares line b(a) = m a + c is reported "
+                "together with its actually resolved a interval and RMS residual."
             ),
             class_="docs-section",
         ),
@@ -511,14 +505,12 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session) -> None:
     def collect_inputs() -> WebInputs:
         return WebInputs.from_millimetres(
+            height_mm=input.magnet_height(),
             follower_radius_mm=input.follower_radius(),
-            follower_height_mm=input.follower_height(),
             follower_remanence_t=input.follower_remanence(),
             attractor_radius_mm=input.attractor_radius(),
-            attractor_height_mm=input.attractor_height(),
             attractor_remanence_t=input.attractor_remanence(),
             repulsor_radius_mm=input.repulsor_radius(),
-            repulsor_height_mm=input.repulsor_height(),
             repulsor_remanence_t=input.repulsor_remanence(),
             resolution_mm=input.resolution(),
             friction_threshold_mn=input.friction(),
@@ -593,6 +585,49 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 "copper",
             ),
             class_="metrics-grid",
+        )
+
+    @output
+    @render.ui
+    def line_fit_summary() -> ui.Tag:
+        value = result()
+        fit = value.line_fit
+        if fit is None:
+            return ui.div(
+                ui.tags.span("PRODUCTION LINE", class_="eyebrow"),
+                ui.h3("No resolved linear-fit interval"),
+                ui.tags.p(
+                    "The practical MPEX4 region contains fewer than two resolved "
+                    "Hyy − Hxx zero crossings. Reduce the map resolution or change the design."
+                ),
+                class_="line-fit-card line-fit-unavailable",
+            )
+        intercept_mm = fit.intercept / MILLIMETRE
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.span("PRODUCTION LINE", class_="eyebrow"),
+                    ui.h3("Linear fit of Hyy − Hxx = 0"),
+                    class_="card-title-group",
+                ),
+                ui.tags.span(f"{fit.points} contour points", class_="method-chip"),
+                class_="visual-card-header",
+            ),
+            ui.div(
+                f"b(a) = {fit.slope:.5f} a {intercept_mm:+.4f} mm",
+                class_="fit-equation",
+            ),
+            ui.div(
+                ui.tags.span(f"slope m = {fit.slope:.6f}"),
+                ui.tags.span(f"intercept c = {intercept_mm:+.4f} mm"),
+                ui.tags.span(
+                    f"fit range: {fit.a_min / MILLIMETRE:.2f} mm ≤ a ≤ "
+                    f"{fit.a_max / MILLIMETRE:.2f} mm"
+                ),
+                ui.tags.span(f"RMS residual = {fit.rms_residual / MILLIMETRE:.4f} mm"),
+                class_="fit-details",
+            ),
+            class_="line-fit-card",
         )
 
     @output

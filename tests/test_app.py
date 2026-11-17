@@ -18,6 +18,10 @@ def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert "Physical friction criterion" in html
     assert "Friction-force threshold" in html
     assert html.index("Physical friction criterion") < html.index("Compute stability map")
+    assert "Follower Magnet" in html
+    assert "Attractor Magnet" in html
+    assert "Repulsor Magnet Pair" in html
+    assert html.count("Height [mm]") == 1
     assert "Selected a" not in html
     assert "a min [mm]" not in html
     assert "b min [mm]" not in html
@@ -29,6 +33,8 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
     assert "necessary condition" in html
     assert "m_{\\mathrm{rep}}" in html
     assert "three force barriers" in html
+    assert "Production-line fit" in html
+    assert "b(a) = m a + c" in html
 
 
 def test_standard_output_has_only_the_chi_map() -> None:

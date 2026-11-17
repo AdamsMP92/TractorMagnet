@@ -123,6 +123,9 @@ The only numerical map input is the final spatial resolution (0.2 mm by
 default). Search limits and the MPEX4 evaluation region are inferred
 automatically. If a stable point reaches the candidate boundary, the region is
 expanded before the final map is cropped around the complete stability band.
+All four magnets share one height input. The app also interpolates the
+practically stable `Hyy - Hxx = 0` contour and reports its least-squares line
+`b(a) = m a + c`, the resolved `a` interval, and the RMS fit residual.
 
 The displayed practical-stability boundary retains the complete scientific
 core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
