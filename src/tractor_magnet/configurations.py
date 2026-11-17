@@ -67,6 +67,34 @@ def article_minimal_configuration(
         polarity=1,
     )
 
+    return minimal_configuration(
+        a,
+        b,
+        follower=follower,
+        attractor=attractor,
+        repulsor=repulsor,
+    )
+
+
+def minimal_configuration(
+    a: float,
+    b: float,
+    *,
+    follower: CylinderMagnet,
+    attractor: CylinderMagnet,
+    repulsor: CylinderMagnet,
+) -> PlanarConfiguration:
+    """Return the symmetric minimal configuration for arbitrary cylinders.
+
+    The movable ``follower`` is evaluated in the common mid-plane. The fixed
+    ``attractor`` is placed at ``(-a, 0)`` and two identical ``repulsor``
+    magnets at ``(0, +/-b)``. Signs are carried by the supplied magnets, so
+    this constructor is also useful outside the article's material choices.
+    """
+
+    if a <= 0.0 or b <= 0.0:
+        raise ValueError("a and b must be positive")
+
     return PlanarConfiguration(
         follower=follower,
         sources=(

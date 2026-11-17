@@ -21,6 +21,7 @@ pixi run format
 pixi run figure-4
 pixi run figure-5
 pixi run supplementary-landscapes
+pixi run app
 ```
 
 ## Code layout
@@ -103,3 +104,23 @@ the practically stable part of the fitted production line. It writes an MP4
 with a fixed spatial domain and energy scale, plus a CSV containing the design
 coordinates and stability diagnostics for every frame. Use, for example,
 `pixi run production-line-animation --frames 200`.
+
+## Browser app
+
+The browser-native Shiny interface follows the same deployment pattern as the
+other scientific apps at <https://adamsmp92.github.io/homepage/software/>. It
+provides a staged design analysis for arbitrary cylindrical follower,
+attractor, and repulsor magnets:
+
+1. the necessary point-dipole moment condition,
+2. an MPEX0 stability map,
+3. an MPEX2 or MPEX4 finite-size refinement.
+
+The displayed practical-stability boundary retains the complete scientific
+core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
+force-barrier thresholds, and transverse centering tolerance. The `chi` map is
+therefore not presented as a stand-alone stability test.
+
+Run the app locally with `pixi run app` and export the static GitHub Pages
+bundle with `pixi run export-site`. All numerical work then runs in the
+visitor's browser; no simulation server is required.

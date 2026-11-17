@@ -2,6 +2,7 @@
 
 from tractor_magnet.configurations import (
     article_minimal_configuration,
+    minimal_configuration,
     supplementary_configurations,
 )
 from tractor_magnet.equilibrium import Equilibrium, find_axial_equilibria, find_planar_equilibria
@@ -29,5 +30,6 @@ __all__ = [
     "evaluate_stability_point",
     "find_axial_equilibria",
     "find_planar_equilibria",
+    "minimal_configuration",
     "supplementary_configurations",
 ]

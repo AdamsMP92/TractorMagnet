@@ -9,9 +9,9 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import brentq
 
-from tractor_magnet.configurations import article_minimal_configuration
+from tractor_magnet.configurations import article_minimal_configuration, minimal_configuration
 from tractor_magnet.constants import MILLIMETRE
-from tractor_magnet.models import PlanarConfiguration, Point2D
+from tractor_magnet.models import CylinderMagnet, PlanarConfiguration, Point2D
 from tractor_magnet.multipole import MultipoleExpansion
 
 _DX = (1, 0, 0)
@@ -120,10 +120,21 @@ class SymmetryLineFit:
     points: int
 
 
-def geometry_is_forbidden(a: float, b: float) -> bool:
-    """Return whether fixed magnets overlap according to Eq. (6)."""
+def geometry_is_forbidden(
+    a: float,
+    b: float,
+    *,
+    attractor_radius: float = 7.5 * MILLIMETRE,
+    repulsor_radius: float = 5.0 * MILLIMETRE,
+) -> bool:
+    """Return whether the three fixed magnets overlap.
 
-    return b < 5.0 * MILLIMETRE or math.hypot(a, b) < 12.5 * MILLIMETRE
+    The defaults reduce to Eq. (6) of the article. The first condition checks
+    the two symmetric repulsors; the second checks either repulsor against the
+    attractor.
+    """
+
+    return b < repulsor_radius or math.hypot(a, b) < attractor_radius + repulsor_radius
 
 
 def _sign_change_roots(
@@ -303,6 +314,9 @@ def evaluate_stability_point(
     centering_tolerance: float | None = None,
     axial_samples: int = 241,
     barrier_samples: int = 201,
+    follower: CylinderMagnet | None = None,
+    attractor: CylinderMagnet | None = None,
+    repulsor: CylinderMagnet | None = None,
 ) -> StabilityPoint:
     """Evaluate all six Fig. 4 quantities for one geometry.
 
@@ -316,7 +330,19 @@ def evaluate_stability_point(
     if axial_samples < 3 or barrier_samples < 3:
         raise ValueError("sample counts must be at least three")
 
-    configuration = article_minimal_configuration(a, b)
+    custom_magnets = (follower, attractor, repulsor)
+    if any(magnet is not None for magnet in custom_magnets):
+        if not all(magnet is not None for magnet in custom_magnets):
+            raise ValueError("follower, attractor, and repulsor must be supplied together")
+        configuration = minimal_configuration(
+            a,
+            b,
+            follower=follower,
+            attractor=attractor,
+            repulsor=repulsor,
+        )
+    else:
+        configuration = article_minimal_configuration(a, b)
     model = MultipoleExpansion(configuration, order=order)
     repulsor_radius = configuration.sources[1].magnet.radius
     selected_half_span = (
@@ -420,6 +446,11 @@ def compute_stability_map(
     order: int,
     friction_threshold: float = 10.0e-3,
     centering_tolerance: float | None = None,
+    axial_samples: int = 241,
+    barrier_samples: int = 201,
+    follower: CylinderMagnet | None = None,
+    attractor: CylinderMagnet | None = None,
+    repulsor: CylinderMagnet | None = None,
     progress: bool = False,
 ) -> StabilityMap:
     """Evaluate a Figure-4 stability map sequentially and deterministically."""
@@ -468,13 +499,23 @@ def compute_stability_map(
                 order=order,
                 friction_threshold=friction_threshold,
                 centering_tolerance=centering_tolerance,
+                axial_samples=axial_samples,
+                barrier_samples=barrier_samples,
+                follower=follower,
+                attractor=attractor,
+                repulsor=repulsor,
             )
             for name in names:
                 fields[name][row, column] = getattr(point, name)
             has_minimum[row, column] = point.has_local_minimum
             passes_threshold[row, column] = point.passes_friction_threshold
             passes_centering[row, column] = point.passes_centering_tolerance
-            forbidden[row, column] = geometry_is_forbidden(float(a), float(b))
+            forbidden[row, column] = geometry_is_forbidden(
+                float(a),
+                float(b),
+                attractor_radius=(attractor.radius if attractor is not None else 7.5 * MILLIMETRE),
+                repulsor_radius=(repulsor.radius if repulsor is not None else 5.0 * MILLIMETRE),
+            )
 
     return StabilityMap(
         order=order,

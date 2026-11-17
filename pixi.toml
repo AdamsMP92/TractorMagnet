@@ -22,6 +22,10 @@ pytest = ">=8,<10"
 pytest-cov = ">=6,<8"
 ruff = ">=0.9,<1"
 
+[pypi-dependencies]
+shiny = ">=1.8,<2"
+shinylive = "==0.8.12"
+
 [feature.dev.tasks]
 test = "pytest"
 lint = "ruff check src tests scripts"
@@ -30,6 +34,8 @@ figure-5 = "python scripts/reproduce_figure_5.py"
 figure-4 = "python scripts/reproduce_figure_4.py"
 supplementary-landscapes = "python scripts/reproduce_supplementary_landscapes.py"
 production-line-animation = "python scripts/animate_production_line_landscape.py"
+app = "shiny run --host 127.0.0.1 --port 8000 src/app.py"
+export-site = "shinylive export src site"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
