@@ -451,6 +451,7 @@ def compute_stability_map(
     follower: CylinderMagnet | None = None,
     attractor: CylinderMagnet | None = None,
     repulsor: CylinderMagnet | None = None,
+    evaluation_mask: ArrayLike | None = None,
     progress: bool = False,
 ) -> StabilityMap:
     """Evaluate a Figure-4 stability map sequentially and deterministically."""
@@ -463,6 +464,11 @@ def compute_stability_map(
         raise ValueError("geometry coordinates must be non-negative")
 
     shape = (b_array.size, a_array.size)
+    selected = np.ones(shape, dtype=bool)
+    if evaluation_mask is not None:
+        selected = np.asarray(evaluation_mask, dtype=bool)
+        if selected.shape != shape:
+            raise ValueError("evaluation_mask must match the (b, a) grid shape")
     names = (
         "equilibrium_x",
         "binding_energy",
@@ -502,6 +508,8 @@ def compute_stability_map(
                 repulsor_radius=repulsor_radius,
             )
             if forbidden[row, column]:
+                continue
+            if not selected[row, column]:
                 continue
             point = evaluate_stability_point(
                 float(a),

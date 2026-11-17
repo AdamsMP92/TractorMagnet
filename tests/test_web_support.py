@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -20,10 +21,7 @@ def _inputs(**overrides) -> WebInputs:
         "repulsor_radius_mm": 5.0,
         "repulsor_height_mm": 10.0,
         "repulsor_remanence_t": 0.39,
-        "a_max_mm": 19.0,
-        "b_max_mm": 14.0,
-        "grid_points": 11,
-        "refinement_order": 0,
+        "resolution_mm": 1.0,
         "friction_threshold_mn": 10.0,
         "centering_tolerance_mm": 1.25,
     }
@@ -78,25 +76,38 @@ def test_custom_minimal_configuration_and_overlap_rule() -> None:
     )
 
 
-def test_small_web_calculation_reuses_dipole_result_for_order_zero() -> None:
+def test_web_calculation_returns_an_adaptive_mpex4_map() -> None:
     calculation = calculate_web(_inputs())
 
-    assert calculation.refined_map is calculation.dipole_map
-    assert calculation.dipole_map.chi.shape == (11, 11)
+    assert calculation.refined_map.order == 4
+    assert calculation.refined_map.stable.any()
     assert math.isfinite(calculation.elapsed_s)
-    assert np.array_equal(
-        calculation.refined_map.geometry_forbidden,
-        calculation.dipole_map.geometry_forbidden,
+    assert calculation.evaluated_points < calculation.full_grid_points
+    assert calculation.search_extent_m > calculation.refined_map.a_values[-1]
+    assert calculation.refined_map.geometry_forbidden[:, 0].any()
+    assert np.isnan(
+        calculation.refined_map.chi[calculation.refined_map.geometry_forbidden]
+    ).all()
+
+    reference = np.load(
+        Path(__file__).parents[1]
+        / "results/figure_4_stability_maps/figure_4_theory_mpex4.npz"
     )
-    assert calculation.dipole_map.geometry_forbidden[:, 0].any()
-    assert calculation.dipole_map.geometry_forbidden[0, :].all()
-    assert np.isnan(calculation.dipole_map.chi[calculation.dipole_map.geometry_forbidden]).all()
+    reference_stable = (
+        reference["has_local_minimum"]
+        & reference["passes_friction_threshold"]
+        & reference["passes_centering_tolerance"]
+        & ~reference["geometry_forbidden"]
+    )[::10, ::10]
+    a_indices = np.rint(reference["a_values"][::10] / MILLIMETRE).astype(int)
+    b_indices = np.rint(reference["b_values"][::10] / MILLIMETRE - 4.0).astype(int)
+    adaptive_stable = calculation.refined_map.stable[np.ix_(b_indices, a_indices)]
+
+    assert np.array_equal(adaptive_stable, reference_stable)
 
 
-def test_web_validation_rejects_unsupported_order_and_invalid_map_limit() -> None:
-    with pytest.raises(ValueError, match="multipole order"):
-        _inputs(refinement_order=6)
-    with pytest.raises(ValueError, match="minimum"):
-        _inputs(b_max_mm=4.0)
-    with pytest.raises(ValueError, match="between 11 and 101"):
-        _inputs(grid_points=102)
+def test_web_validation_rejects_excessive_or_nonpositive_resolution() -> None:
+    with pytest.raises(ValueError, match="between 0.1 mm and 2.0 mm"):
+        _inputs(resolution_mm=0.05)
+    with pytest.raises(ValueError, match="positive"):
+        _inputs(resolution_mm=0.0)

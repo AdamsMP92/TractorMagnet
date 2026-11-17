@@ -1,9 +1,14 @@
 import math
 
+import numpy as np
 import pytest
 
 from tractor_magnet.constants import MILLIMETRE
-from tractor_magnet.stability_map import evaluate_stability_point, geometry_is_forbidden
+from tractor_magnet.stability_map import (
+    compute_stability_map,
+    evaluate_stability_point,
+    geometry_is_forbidden,
+)
 
 
 def test_geometry_exclusion_reproduces_equation_6() -> None:
@@ -57,3 +62,31 @@ def test_soft_transverse_trap_fails_practical_centering_tolerance() -> None:
     assert point.passes_friction_threshold
     assert point.transverse_friction_crossing / MILLIMETRE == pytest.approx(2.375, rel=2e-3)
     assert not point.passes_centering_tolerance
+
+
+def test_evaluation_mask_skips_unselected_locations() -> None:
+    a_values = np.asarray((12.0, 14.0)) * MILLIMETRE
+    b_values = np.asarray((8.0, 12.0)) * MILLIMETRE
+    selected = np.asarray(((False, False), (False, True)))
+
+    result = compute_stability_map(
+        a_values,
+        b_values,
+        order=0,
+        axial_samples=121,
+        barrier_samples=101,
+        evaluation_mask=selected,
+    )
+
+    assert np.isnan(result.equilibrium_x[~selected]).all()
+    assert np.isfinite(result.equilibrium_x[selected]).all()
+
+
+def test_evaluation_mask_must_match_map_shape() -> None:
+    with pytest.raises(ValueError, match="evaluation_mask"):
+        compute_stability_map(
+            np.asarray((12.0, 14.0)) * MILLIMETRE,
+            np.asarray((8.0, 12.0)) * MILLIMETRE,
+            order=0,
+            evaluation_mask=np.ones((1, 2), dtype=bool),
+        )

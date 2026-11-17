@@ -1,8 +1,4 @@
-"""Validated adapter between the scientific core and the browser app.
-
-The public package remains SI based.  This module owns only browser-facing
-defaults, unit conversion, staged MPEX calculations, and compact summaries.
-"""
+"""Validated adapter between the scientific core and the browser app."""
 
 from __future__ import annotations
 
@@ -10,16 +6,15 @@ import math
 import time
 from dataclasses import dataclass
 
-import numpy as np
-
+from tractor_magnet.adaptive_map import compute_adaptive_stability_map
 from tractor_magnet.constants import MILLIMETRE
 from tractor_magnet.models import CylinderMagnet
-from tractor_magnet.stability_map import StabilityMap, compute_stability_map
+from tractor_magnet.stability_map import StabilityMap
 
 
 @dataclass(frozen=True, slots=True)
 class WebInputs:
-    """Complete, hashable input state for one browser calculation."""
+    """Complete, hashable input state for one adaptive browser calculation."""
 
     follower_radius_m: float
     follower_height_m: float
@@ -30,12 +25,7 @@ class WebInputs:
     repulsor_radius_m: float
     repulsor_height_m: float
     repulsor_remanence_t: float
-    a_min_m: float
-    a_max_m: float
-    b_min_m: float
-    b_max_m: float
-    grid_points: int = 21
-    refinement_order: int = 4
+    resolution_m: float
     friction_threshold_n: float = 10.0e-3
     centering_tolerance_m: float = 1.25e-3
 
@@ -52,38 +42,23 @@ class WebInputs:
         repulsor_radius_mm: float,
         repulsor_height_mm: float,
         repulsor_remanence_t: float,
-        a_max_mm: float,
-        b_max_mm: float,
-        grid_points: int,
-        refinement_order: int,
+        resolution_mm: float,
         friction_threshold_mn: float,
         centering_tolerance_mm: float,
     ) -> WebInputs:
         """Construct validated SI inputs from the units shown by the app."""
 
-        attractor_radius_mm = float(attractor_radius_mm)
-        repulsor_radius_mm = float(repulsor_radius_mm)
-        # The lower a boundary is the a-coordinate of the fixed-magnet
-        # collision circle at 90 degrees, measured from the positive a-axis.
-        # Hence a_min = (R_att + R_rep) cos(90 degrees) = 0.
-        a_min_mm = 0.0
-        b_min_mm = max(0.0, float(math.floor(repulsor_radius_mm) - 1.0))
         result = cls(
             follower_radius_m=float(follower_radius_mm) * MILLIMETRE,
             follower_height_m=float(follower_height_mm) * MILLIMETRE,
             follower_remanence_t=float(follower_remanence_t),
-            attractor_radius_m=attractor_radius_mm * MILLIMETRE,
+            attractor_radius_m=float(attractor_radius_mm) * MILLIMETRE,
             attractor_height_m=float(attractor_height_mm) * MILLIMETRE,
             attractor_remanence_t=float(attractor_remanence_t),
-            repulsor_radius_m=repulsor_radius_mm * MILLIMETRE,
+            repulsor_radius_m=float(repulsor_radius_mm) * MILLIMETRE,
             repulsor_height_m=float(repulsor_height_mm) * MILLIMETRE,
             repulsor_remanence_t=float(repulsor_remanence_t),
-            a_min_m=float(a_min_mm) * MILLIMETRE,
-            a_max_m=float(a_max_mm) * MILLIMETRE,
-            b_min_m=float(b_min_mm) * MILLIMETRE,
-            b_max_m=float(b_max_mm) * MILLIMETRE,
-            grid_points=int(grid_points),
-            refinement_order=int(refinement_order),
+            resolution_m=float(resolution_mm) * MILLIMETRE,
             friction_threshold_n=float(friction_threshold_mn) * 1.0e-3,
             centering_tolerance_m=float(centering_tolerance_mm) * MILLIMETRE,
         )
@@ -105,8 +80,7 @@ class WebInputs:
                 ("repulsor radius", self.repulsor_radius_m),
                 ("repulsor height", self.repulsor_height_m),
                 ("repulsor remanence", self.repulsor_remanence_t),
-                ("a maximum", self.a_max_m),
-                ("b maximum", self.b_max_m),
+                ("resolution", self.resolution_m),
                 ("friction threshold", self.friction_threshold_n),
                 ("centering tolerance", self.centering_tolerance_m),
             )
@@ -117,23 +91,19 @@ class WebInputs:
         nonpositive = [name for name, value in values.items() if value <= 0.0]
         if nonpositive:
             raise ValueError(f"Inputs must be positive: {', '.join(nonpositive)}")
-        map_minima = {
-            "a minimum": self.a_min_m,
-            "b minimum": self.b_min_m,
-        }
-        invalid_minima = [
-            name for name, value in map_minima.items() if not math.isfinite(value) or value < 0.0
-        ]
-        if invalid_minima:
-            raise ValueError(
-                f"Map minima must be finite and non-negative: {', '.join(invalid_minima)}"
-            )
-        if self.a_min_m >= self.a_max_m or self.b_min_m >= self.b_max_m:
-            raise ValueError("Each map minimum must be smaller than its maximum.")
-        if self.refinement_order not in (0, 2, 4):
-            raise ValueError("The multipole order must be 0, 2, or 4.")
-        if not 11 <= self.grid_points <= 101:
-            raise ValueError("The web grid must contain between 11 and 101 points per axis.")
+        if not 0.1 * MILLIMETRE <= self.resolution_m <= 2.0 * MILLIMETRE:
+            raise ValueError("Resolution must lie between 0.1 mm and 2.0 mm.")
+
+    @property
+    def a_min_m(self) -> float:
+        return 0.0
+
+    @property
+    def b_min_m(self) -> float:
+        return max(
+            0.0,
+            math.floor(self.repulsor_radius_m / MILLIMETRE) * MILLIMETRE - MILLIMETRE,
+        )
 
     @property
     def follower(self) -> CylinderMagnet:
@@ -177,42 +147,36 @@ class WebInputs:
 
 @dataclass(frozen=True, slots=True)
 class WebCalculation:
-    """Staged dipole and multipole results retained by the browser."""
+    """Adaptive MPEX4 result retained by the browser."""
 
     inputs: WebInputs
-    dipole_map: StabilityMap
     refined_map: StabilityMap
+    search_extent_m: float
+    evaluated_points: int
+    full_grid_points: int
+    scout_points: int
     elapsed_s: float
 
 
-def _map(inputs: WebInputs, order: int) -> StabilityMap:
-    a_values = np.linspace(inputs.a_min_m, inputs.a_max_m, inputs.grid_points)
-    b_values = np.linspace(inputs.b_min_m, inputs.b_max_m, inputs.grid_points)
-    return compute_stability_map(
-        a_values,
-        b_values,
-        order=order,
+def calculate_web(inputs: WebInputs) -> WebCalculation:
+    """Run the automatic MPEX0 scout and sparse MPEX4 refinement."""
+
+    inputs.validate()
+    started = time.perf_counter()
+    result = compute_adaptive_stability_map(
+        inputs.resolution_m,
         friction_threshold=inputs.friction_threshold_n,
         centering_tolerance=inputs.centering_tolerance_m,
         follower=inputs.follower,
         attractor=inputs.attractor,
         repulsor=inputs.repulsor,
     )
-
-
-def calculate_web(inputs: WebInputs) -> WebCalculation:
-    """Run the point-dipole baseline and requested MPEX refinement."""
-
-    inputs.validate()
-    started = time.perf_counter()
-    dipole_map = _map(inputs, 0)
-    if inputs.refinement_order == 0:
-        refined_map = dipole_map
-    else:
-        refined_map = _map(inputs, inputs.refinement_order)
     return WebCalculation(
         inputs=inputs,
-        dipole_map=dipole_map,
-        refined_map=refined_map,
+        refined_map=result.stability_map,
+        search_extent_m=result.search_extent,
+        evaluated_points=result.evaluated_points,
+        full_grid_points=result.full_grid_points,
+        scout_points=result.scout_points,
         elapsed_s=time.perf_counter() - started,
     )

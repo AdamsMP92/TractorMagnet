@@ -6,16 +6,18 @@ from shiny import App
 from app import _mask_to_practical_region, app, calculator_panel, input_panel, method_panel
 
 
-def test_shiny_app_constructs_with_staged_controls() -> None:
+def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert isinstance(app, App)
     html = str(input_panel)
-    assert "MPEX0" in html
-    assert "MPEX2" in html
-    assert "MPEX4" in html
-    assert "101 × 101" in html
+    assert "Compute stability map" in html
+    assert "Resolution [mm]" in html
+    assert "Refinement order" not in html
+    assert "Grid per axis" not in html
+    assert "a max [mm]" not in html
+    assert "b max [mm]" not in html
     assert "Physical friction criterion" in html
     assert "Friction-force threshold" in html
-    assert html.index("Physical friction criterion") < html.index("Map and model")
+    assert html.index("Physical friction criterion") < html.index("Compute stability map")
     assert "Selected a" not in html
     assert "a min [mm]" not in html
     assert "b min [mm]" not in html

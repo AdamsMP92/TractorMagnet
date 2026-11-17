@@ -112,12 +112,17 @@ The deployed app is available at
 
 The browser-native Shiny interface follows the same deployment pattern as the
 other scientific apps at <https://adamsmp92.github.io/homepage/software/>. It
-provides a staged design analysis for arbitrary cylindrical follower,
+provides an adaptive design analysis for arbitrary cylindrical follower,
 attractor, and repulsor magnets:
 
 1. the necessary point-dipole moment condition,
-2. an MPEX0 stability map,
-3. an MPEX2 or MPEX4 finite-size refinement.
+2. an automatically expanding MPEX0 scout,
+3. a sparse exact-cylinder MPEX4 refinement of the candidate band.
+
+The only numerical map input is the final spatial resolution (0.2 mm by
+default). Search limits and the MPEX4 evaluation region are inferred
+automatically. If a stable point reaches the candidate boundary, the region is
+expanded before the final map is cropped around the complete stability band.
 
 The displayed practical-stability boundary retains the complete scientific
 core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
@@ -133,6 +138,8 @@ grey geometric-exclusion region visible in the map. The geometric `b_min` is
 the repulsor radius; the displayed lower limit is rounded down to a whole
 millimetre and shifted down by one additional millimetre. Geometrically
 excluded samples are masked before the field calculation.
+The grey overlap region is drawn from the analytical circle and line
+boundaries, so its visual resolution is independent of the numerical map grid.
 
 Run the app locally with `pixi run app` and export the static GitHub Pages
 bundle with `pixi run export-site`. All numerical work then runs in the

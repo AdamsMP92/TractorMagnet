@@ -72,10 +72,41 @@ def _mask_to_practical_region(
     return np.ma.masked_where(~stability_map.stable | ~np.isfinite(values), values)
 
 
+def _plot_forbidden_geometry(
+    axis: plt.Axes,
+    inputs: WebInputs,
+    *,
+    x_max_mm: float,
+    b_min_mm: float,
+) -> None:
+    """Draw the exact overlap boundary independently of the numerical grid."""
+
+    repulsor_radius_mm = inputs.repulsor_radius_m / MILLIMETRE
+    radius_sum_mm = (inputs.attractor_radius_m + inputs.repulsor_radius_m) / MILLIMETRE
+    intersection_mm = math.sqrt(max(0.0, radius_sum_mm**2 - repulsor_radius_mm**2))
+    arc_end_mm = min(x_max_mm, intersection_mm)
+    arc_x = np.linspace(0.0, arc_end_mm, 512)
+    arc_y = np.sqrt(np.maximum(0.0, radius_sum_mm**2 - arc_x**2))
+    boundary: list[tuple[float, float]] = []
+    if x_max_mm > intersection_mm:
+        boundary.extend(((x_max_mm, repulsor_radius_mm), (intersection_mm, repulsor_radius_mm)))
+    boundary.extend(zip(arc_x[::-1], arc_y[::-1], strict=True))
+    polygon = [(0.0, b_min_mm), (x_max_mm, b_min_mm), *boundary]
+    axis.fill(
+        *zip(*polygon, strict=True),
+        facecolor="#aeb7c4",
+        edgecolor="#7d8794",
+        linewidth=0.9,
+        alpha=0.72,
+        zorder=2,
+    )
+
+
 def _plot_map(
     axis: plt.Axes,
     stability_map: StabilityMap,
     *,
+    inputs: WebInputs,
     title: str,
     norm: Normalize,
 ) -> object:
@@ -83,13 +114,11 @@ def _plot_map(
     b_mm = stability_map.b_values / MILLIMETRE
     values = _mask_to_practical_region(stability_map, stability_map.chi)
     image = axis.pcolormesh(a_mm, b_mm, values, cmap="coolwarm", norm=norm, shading="auto")
-    axis.contourf(
-        a_mm,
-        b_mm,
-        stability_map.geometry_forbidden.astype(float),
-        levels=(0.5, 1.5),
-        colors=("#aeb7c4",),
-        alpha=0.72,
+    _plot_forbidden_geometry(
+        axis,
+        inputs,
+        x_max_mm=float(a_mm[-1]),
+        b_min_mm=float(b_mm[0]),
     )
     if np.any(stability_map.stable) and np.any(~stability_map.stable):
         axis.contour(
@@ -156,7 +185,8 @@ def _stability_figure(calculation: WebCalculation):
     _plot_map(
         axis,
         calculation.refined_map,
-        title=f"MPEX{calculation.inputs.refinement_order} curvature-symmetry map",
+        inputs=calculation.inputs,
+        title="Adaptive MPEX4 curvature-symmetry map",
         norm=norm,
     )
     figure.suptitle(
@@ -297,63 +327,15 @@ input_panel = ui.div(
         ),
         class_="input-pair",
     ),
-    _input_section("05", "Map and model"),
-    ui.div(
-        _field(
-            "a_max",
-            "a max [mm]",
-            19.0,
-            minimum=0.2,
-            maximum=80,
-            step=0.5,
-            note="Horizontal map limit",
-        ),
-        _field(
-            "b_max",
-            "b max [mm]",
-            14.0,
-            minimum=0.2,
-            maximum=80,
-            step=0.5,
-            note="Vertical map limit",
-        ),
-        class_="input-pair",
-    ),
-    ui.div(
-        ui.div(
-            ui.input_select(
-                "order",
-                "Refinement order",
-                {"0": "MPEX0", "2": "MPEX2", "4": "MPEX4"},
-                selected="4",
-            ),
-            ui.tags.small("0: dipole · 2/4: finite-size refinement", class_="field-note"),
-            class_="field-block",
-        ),
-        ui.div(
-            ui.input_select(
-                "grid_points",
-                "Grid per axis",
-                {
-                    "15": "15 × 15",
-                    "21": "21 × 21",
-                    "31": "31 × 31",
-                    "41": "41 × 41",
-                    "51": "51 × 51",
-                    "61": "61 × 61",
-                    "71": "71 × 71",
-                    "81": "81 × 81",
-                    "101": "101 × 101",
-                },
-                selected="21",
-            ),
-            ui.tags.small(
-                "MPEX4 runtime grows approximately with the number of grid points",
-                class_="field-note",
-            ),
-            class_="field-block",
-        ),
-        class_="input-pair",
+    _input_section("05", "Compute stability map"),
+    _field(
+        "resolution",
+        "Resolution [mm]",
+        0.2,
+        minimum=0.1,
+        maximum=2.0,
+        step=0.1,
+        note="Final MPEX4 spacing; search extent is determined automatically",
     ),
     ui.input_action_button("calculate", "Analyze configuration", class_="btn-calculate"),
     ui.div(
@@ -392,10 +374,10 @@ calculator_panel = ui.div(
 method_panel = ui.div(
     ui.div(
         ui.tags.span("MODEL", class_="eyebrow"),
-        ui.h2("Three levels, one calculation core"),
+        ui.h2("One automatic calculation pipeline"),
         ui.tags.p(
             "The web layer changes neither the Cartesian moments nor the analytical "
-            "derivatives. It only validates units and selects the requested map.",
+            "derivatives. It validates units and controls the adaptive MPEX4 search.",
             class_="docs-lead",
         ),
         class_="docs-intro",
@@ -414,21 +396,20 @@ method_panel = ui.div(
         ),
         ui.div(
             ui.tags.span("02", class_="docs-number"),
-            ui.h3("Dipole estimate"),
+            ui.h3("Adaptive MPEX0 scout"),
             ui.tags.p(
-                "MPEX0 retains the magnetic dipole moments and locates the exterior "
-                "axial minimum. It supplies the inexpensive first map and a reference "
-                "for convergence."
+                "A cheap, automatically expanding MPEX0 search finds a relaxed candidate "
+                "band around the practical stability region."
             ),
             class_="docs-section",
         ),
         ui.div(
             ui.tags.span("03", class_="docs-number"),
-            ui.h3("Finite-size refinement"),
+            ui.h3("Sparse MPEX4 refinement"),
             ui.tags.p(
-                "MPEX2 and MPEX4 use the exact Cartesian moments of uniformly "
-                "magnetized cylinders. Energy, force, and Hessian are differentiated "
-                "analytically."
+                "MPEX4 is evaluated only inside the candidate band and expands it if a "
+                "stable point reaches its boundary. Energy, force, and Hessian remain "
+                "analytically differentiated."
             ),
             class_="docs-section",
         ),
@@ -490,8 +471,8 @@ app_ui = ui.page_fluid(
                         ui.h1("Tractor Magnet Designer"),
                         ui.tags.p(
                             "Explore the minimal symmetric configuration from the moment "
-                            "inequality through dipole estimation to exact-cylinder "
-                            "Cartesian multipole refinement."
+                            "inequality through an adaptive dipole scout to sparse "
+                            "exact-cylinder MPEX4 refinement."
                         ),
                     ),
                     class_="hero-copy",
@@ -539,10 +520,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             repulsor_radius_mm=input.repulsor_radius(),
             repulsor_height_mm=input.repulsor_height(),
             repulsor_remanence_t=input.repulsor_remanence(),
-            a_max_mm=input.a_max(),
-            b_max_mm=input.b_max(),
-            grid_points=int(input.grid_points()),
-            refinement_order=int(input.order()),
+            resolution_mm=input.resolution(),
             friction_threshold_mn=input.friction(),
             centering_tolerance_mm=input.centering(),
         )
@@ -553,7 +531,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         try:
             inputs = collect_inputs()
             with ui.Progress(min=0, max=1) as progress:
-                progress.set(0.05, message="Evaluating dipole and multipole maps…")
+                progress.set(0.05, message="Scouting and refining the adaptive MPEX4 map…")
                 result = calculate_web(inputs)
                 progress.set(1.0, message="Analysis complete")
             return result
@@ -576,17 +554,12 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 class_="calculation-message message-error",
             )
         condition = "passes" if value.inputs.passes_moment_condition else "fails"
-        stages = (
-            "MPEX0 was evaluated"
-            if value.inputs.refinement_order == 0
-            else f"MPEX0 and MPEX{value.inputs.refinement_order} were evaluated"
-        )
         return ui.div(
-            ui.tags.strong("Three-stage check complete"),
+            ui.tags.strong("Adaptive stability search complete"),
             ui.tags.span(
-                f"The moment condition {condition}; {stages} on "
-                f"{value.inputs.grid_points} × {value.inputs.grid_points} grids in "
-                f"{value.elapsed_s:.2f} s."
+                f"The moment condition {condition}; the MPEX0 scout selected "
+                f"{value.evaluated_points} of {value.full_grid_points} possible locations "
+                f"for MPEX4 in {value.elapsed_s:.2f} s."
             ),
             class_="calculation-message message-success"
             if value.inputs.passes_moment_condition
@@ -607,16 +580,16 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             ),
             _metric_card(
                 "Approximation",
-                f"MPEX{value.inputs.refinement_order}",
+                "MPEX4",
                 "",
-                "finite-size refinement order",
+                "automatic MPEX0 scout",
                 "indigo",
             ),
             _metric_card(
-                "Grid",
-                f"{value.inputs.grid_points} × {value.inputs.grid_points}",
-                "",
-                f"calculated in {value.elapsed_s:.2f} s",
+                "Resolution",
+                _format(value.inputs.resolution_m / MILLIMETRE),
+                "mm",
+                f"{value.evaluated_points} MPEX4 points · {value.elapsed_s:.2f} s",
                 "copper",
             ),
             class_="metrics-grid",
