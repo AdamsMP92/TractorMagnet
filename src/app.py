@@ -11,10 +11,14 @@ from matplotlib.colors import Normalize
 from shiny import App, Inputs, Outputs, Session, reactive, render, req, ui
 
 from tractor_magnet.constants import MILLIMETRE
+from tractor_magnet.materials import MAGNET_GRADES, magnet_grade
 from tractor_magnet.stability_map import StabilityMap
 from web_support import WebCalculation, WebInputs, calculate_web
 
 APP_DIR = Path(__file__).parent
+GRADE_CHOICES = {grade.key: grade.label for grade in MAGNET_GRADES}
+DEFAULT_NDFEB_GRADE = magnet_grade("ndfeb_n42")
+DEFAULT_FERRITE_GRADE = magnet_grade("ferrite_y30bh")
 
 
 def _field(
@@ -56,6 +60,17 @@ def _metric_card(label: str, value: str, unit: str, detail: str, accent: str) ->
         ),
         ui.tags.p(detail, class_="metric-detail"),
         class_=f"metric-card metric-card-{accent}",
+    )
+
+
+def _grade_field(input_id: str, *, selected: str) -> ui.Tag:
+    return ui.div(
+        ui.input_select(input_id, "Magnet grade", GRADE_CHOICES, selected=selected),
+        ui.tags.small(
+            "Room-temperature remanence range from the material grade",
+            class_="field-note",
+        ),
+        class_="field-block",
     )
 
 
@@ -223,70 +238,64 @@ input_panel = ui.div(
         note="Shared by follower, attractor, and both repulsors",
     ),
     _input_section("02", "Follower Magnet"),
-    ui.div(
-        _field(
-            "follower_radius",
-            "Radius [mm]",
-            7.5,
-            minimum=0.1,
-            maximum=30,
-            step=0.1,
-            note="Movable cylinder",
-        ),
-        _field(
-            "follower_remanence",
-            "Remanence Br [T]",
-            1.3,
-            minimum=0.001,
-            maximum=3,
-            step=0.01,
-            note="Positive model polarity",
-        ),
-        class_="input-pair",
+    _field(
+        "follower_radius",
+        "Radius [mm]",
+        7.5,
+        minimum=0.1,
+        maximum=30,
+        step=0.1,
+        note="Movable cylinder",
+    ),
+    _grade_field("follower_grade", selected=DEFAULT_NDFEB_GRADE.key),
+    _field(
+        "follower_remanence",
+        "Remanence Br [T]",
+        DEFAULT_NDFEB_GRADE.nominal_remanence,
+        minimum=DEFAULT_NDFEB_GRADE.remanence_min,
+        maximum=DEFAULT_NDFEB_GRADE.remanence_max,
+        step=0.001,
+        note="Selected-grade range · 1 mT steps · positive polarity",
     ),
     _input_section("03", "Attractor Magnet"),
-    ui.div(
-        _field(
-            "attractor_radius",
-            "Radius [mm]",
-            7.5,
-            minimum=0.1,
-            maximum=30,
-            step=0.1,
-            note="Fixed at (-a, 0)",
-        ),
-        _field(
-            "attractor_remanence",
-            "Remanence Br [T]",
-            1.3,
-            minimum=0.001,
-            maximum=3,
-            step=0.01,
-            note="Opposite polarity to follower",
-        ),
-        class_="input-pair",
+    _field(
+        "attractor_radius",
+        "Radius [mm]",
+        7.5,
+        minimum=0.1,
+        maximum=30,
+        step=0.1,
+        note="Fixed at (-a, 0)",
+    ),
+    _grade_field("attractor_grade", selected=DEFAULT_NDFEB_GRADE.key),
+    _field(
+        "attractor_remanence",
+        "Remanence Br [T]",
+        DEFAULT_NDFEB_GRADE.nominal_remanence,
+        minimum=DEFAULT_NDFEB_GRADE.remanence_min,
+        maximum=DEFAULT_NDFEB_GRADE.remanence_max,
+        step=0.001,
+        note="Selected-grade range · 1 mT steps · opposite polarity",
     ),
     _input_section("04", "Repulsor Magnet Pair"),
-    ui.div(
-        _field(
-            "repulsor_radius",
-            "Radius [mm]",
-            5.0,
-            minimum=1.0,
-            maximum=30,
-            step=0.1,
-            note="Fixed at (0, ±b)",
-        ),
-        _field(
-            "repulsor_remanence",
-            "Remanence Br [T]",
-            0.39,
-            minimum=0.001,
-            maximum=3,
-            step=0.01,
-            note="Same polarity as follower",
-        ),
-        class_="input-pair",
+    _field(
+        "repulsor_radius",
+        "Radius [mm]",
+        5.0,
+        minimum=1.0,
+        maximum=30,
+        step=0.1,
+        note="Fixed at (0, ±b)",
+    ),
+    _grade_field("repulsor_grade", selected=DEFAULT_FERRITE_GRADE.key),
+    _field(
+        "repulsor_remanence",
+        "Remanence Br [T]",
+        DEFAULT_FERRITE_GRADE.nominal_remanence,
+        minimum=DEFAULT_FERRITE_GRADE.remanence_min,
+        maximum=DEFAULT_FERRITE_GRADE.remanence_max,
+        step=0.001,
+        note="Selected-grade range · 1 mT steps · same polarity as follower",
     ),
     _input_section("05", "Physical friction criterion"),
     ui.div(
@@ -418,6 +427,22 @@ method_panel = ui.div(
             ),
             class_="docs-section",
         ),
+        ui.div(
+            ui.tags.span("06", class_="docs-number"),
+            ui.h3("Material-grade bounds"),
+            ui.tags.p(
+                "Ferrite and NdFeB remanence intervals are room-temperature reference "
+                "values. A grade selection sets the rounded midpoint and constrains Br "
+                "to the published interval in 1 mT steps."
+            ),
+            ui.tags.a(
+                "Physical magnet data",
+                href="https://www.supermagnete.de/physical-magnet-data",
+                target="_blank",
+                class_="docs-link",
+            ),
+            class_="docs-section",
+        ),
         class_="docs-grid",
     ),
     ui.div(
@@ -503,14 +528,43 @@ app_ui = ui.page_fluid(
 
 
 def server(input: Inputs, output: Outputs, session: Session) -> None:
+    def update_remanence(input_id: str, grade_key: str) -> None:
+        grade = magnet_grade(grade_key)
+        ui.update_numeric(
+            input_id,
+            value=grade.nominal_remanence,
+            min=grade.remanence_min,
+            max=grade.remanence_max,
+            step=0.001,
+            session=session,
+        )
+
+    @reactive.effect
+    @reactive.event(input.follower_grade)
+    def update_follower_grade() -> None:
+        update_remanence("follower_remanence", str(input.follower_grade()))
+
+    @reactive.effect
+    @reactive.event(input.attractor_grade)
+    def update_attractor_grade() -> None:
+        update_remanence("attractor_remanence", str(input.attractor_grade()))
+
+    @reactive.effect
+    @reactive.event(input.repulsor_grade)
+    def update_repulsor_grade() -> None:
+        update_remanence("repulsor_remanence", str(input.repulsor_grade()))
+
     def collect_inputs() -> WebInputs:
         return WebInputs.from_millimetres(
             height_mm=input.magnet_height(),
             follower_radius_mm=input.follower_radius(),
+            follower_grade=input.follower_grade(),
             follower_remanence_t=input.follower_remanence(),
             attractor_radius_mm=input.attractor_radius(),
+            attractor_grade=input.attractor_grade(),
             attractor_remanence_t=input.attractor_remanence(),
             repulsor_radius_mm=input.repulsor_radius(),
+            repulsor_grade=input.repulsor_grade(),
             repulsor_remanence_t=input.repulsor_remanence(),
             resolution_mm=input.resolution(),
             friction_threshold_mn=input.friction(),

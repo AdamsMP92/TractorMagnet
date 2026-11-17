@@ -126,6 +126,11 @@ expanded before the final map is cropped around the complete stability band.
 All four magnets share one height input. The app also interpolates the
 practically stable `Hyy - Hxx = 0` contour and reports its least-squares line
 `b(a) = m a + c`, the resolved `a` interval, and the RMS fit residual.
+Each magnet type is assigned a ferrite or NdFeB material grade from the
+[physical magnet data published by supermagnete.de](https://www.supermagnete.de/physical-magnet-data).
+Selecting a grade resets `Br` to its range midpoint rounded to 1 mT; `Br` can
+then be adjusted in 1 mT increments within that grade's room-temperature
+remanence interval.
 
 The displayed practical-stability boundary retains the complete scientific
 core: fixed-magnet overlap exclusion, a positive planar Hessian, all three

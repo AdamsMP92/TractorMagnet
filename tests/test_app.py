@@ -22,6 +22,17 @@ def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert "Attractor Magnet" in html
     assert "Repulsor Magnet Pair" in html
     assert html.count("Height [mm]") == 1
+    assert "Ferrite Y35 (0.400–0.410 T)" in html
+    assert "NdFeB N52 (1.420–1.470 T)" in html
+    follower = html.index("Follower Magnet")
+    attractor = html.index("Attractor Magnet")
+    assert follower < html.index("Radius [mm]", follower, attractor)
+    assert html.index("Radius [mm]", follower, attractor) < html.index(
+        "Magnet grade", follower, attractor
+    )
+    assert html.index("Magnet grade", follower, attractor) < html.index(
+        "Remanence Br [T]", follower, attractor
+    )
     assert "Selected a" not in html
     assert "a min [mm]" not in html
     assert "b min [mm]" not in html
@@ -35,6 +46,8 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
     assert "three force barriers" in html
     assert "Production-line fit" in html
     assert "b(a) = m a + c" in html
+    assert "Material-grade bounds" in html
+    assert "supermagnete.de/physical-magnet-data" in html
 
 
 def test_standard_output_has_only_the_chi_map() -> None:

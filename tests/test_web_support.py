@@ -14,10 +14,13 @@ def _inputs(**overrides) -> WebInputs:
     values = {
         "height_mm": 10.0,
         "follower_radius_mm": 7.5,
+        "follower_grade": "ndfeb_n42",
         "follower_remanence_t": 1.3,
         "attractor_radius_mm": 7.5,
+        "attractor_grade": "ndfeb_n42",
         "attractor_remanence_t": 1.3,
         "repulsor_radius_mm": 5.0,
+        "repulsor_grade": "ferrite_y30bh",
         "repulsor_remanence_t": 0.39,
         "resolution_mm": 1.0,
         "friction_threshold_mn": 10.0,
@@ -113,3 +116,10 @@ def test_web_validation_rejects_excessive_or_nonpositive_resolution() -> None:
         _inputs(resolution_mm=0.05)
     with pytest.raises(ValueError, match="positive"):
         _inputs(resolution_mm=0.0)
+
+
+def test_web_validation_rejects_remanence_outside_selected_grade() -> None:
+    with pytest.raises(ValueError, match="Follower remanence"):
+        _inputs(follower_grade="ndfeb_n35", follower_remanence_t=1.3)
+    with pytest.raises(ValueError, match="Unsupported magnet grade"):
+        _inputs(repulsor_grade="unknown")
