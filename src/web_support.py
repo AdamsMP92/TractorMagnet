@@ -67,7 +67,7 @@ class WebInputs:
         # collision circle at 90 degrees, measured from the positive a-axis.
         # Hence a_min = (R_att + R_rep) cos(90 degrees) = 0.
         a_min_mm = 0.0
-        b_min_mm = max(1.0, float(math.floor(repulsor_radius_mm)))
+        b_min_mm = max(0.0, float(math.floor(repulsor_radius_mm) - 1.0))
         result = cls(
             follower_radius_m=float(follower_radius_mm) * MILLIMETRE,
             follower_height_m=float(follower_height_mm) * MILLIMETRE,
@@ -106,7 +106,6 @@ class WebInputs:
                 ("repulsor height", self.repulsor_height_m),
                 ("repulsor remanence", self.repulsor_remanence_t),
                 ("a maximum", self.a_max_m),
-                ("b minimum", self.b_min_m),
                 ("b maximum", self.b_max_m),
                 ("friction threshold", self.friction_threshold_n),
                 ("centering tolerance", self.centering_tolerance_m),
@@ -118,8 +117,17 @@ class WebInputs:
         nonpositive = [name for name, value in values.items() if value <= 0.0]
         if nonpositive:
             raise ValueError(f"Inputs must be positive: {', '.join(nonpositive)}")
-        if not math.isfinite(self.a_min_m) or self.a_min_m < 0.0:
-            raise ValueError("The a minimum must be finite and non-negative.")
+        map_minima = {
+            "a minimum": self.a_min_m,
+            "b minimum": self.b_min_m,
+        }
+        invalid_minima = [
+            name for name, value in map_minima.items() if not math.isfinite(value) or value < 0.0
+        ]
+        if invalid_minima:
+            raise ValueError(
+                f"Map minima must be finite and non-negative: {', '.join(invalid_minima)}"
+            )
         if self.a_min_m >= self.a_max_m or self.b_min_m >= self.b_max_m:
             raise ValueError("Each map minimum must be smaller than its maximum.")
         if self.refinement_order not in (0, 2, 4):

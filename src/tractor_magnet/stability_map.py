@@ -459,8 +459,8 @@ def compute_stability_map(
     b_array = np.asarray(b_values, dtype=float)
     if a_array.ndim != 1 or b_array.ndim != 1 or not a_array.size or not b_array.size:
         raise ValueError("a_values and b_values must be non-empty one-dimensional arrays")
-    if np.any(a_array < 0.0) or np.any(b_array <= 0.0):
-        raise ValueError("a coordinates must be non-negative and b coordinates positive")
+    if np.any(a_array < 0.0) or np.any(b_array < 0.0):
+        raise ValueError("geometry coordinates must be non-negative")
 
     shape = (b_array.size, a_array.size)
     names = (
@@ -488,11 +488,21 @@ def compute_stability_map(
     passes_threshold = np.zeros(shape, dtype=bool)
     passes_centering = np.zeros(shape, dtype=bool)
     forbidden = np.zeros(shape, dtype=bool)
+    attractor_radius = attractor.radius if attractor is not None else 7.5 * MILLIMETRE
+    repulsor_radius = repulsor.radius if repulsor is not None else 5.0 * MILLIMETRE
 
     for row, b in enumerate(b_array):
         if progress:
             print(f"MPEX{order}: row {row + 1}/{b_array.size} (b={b / MILLIMETRE:.2f} mm)")
         for column, a in enumerate(a_array):
+            forbidden[row, column] = geometry_is_forbidden(
+                float(a),
+                float(b),
+                attractor_radius=attractor_radius,
+                repulsor_radius=repulsor_radius,
+            )
+            if forbidden[row, column]:
+                continue
             point = evaluate_stability_point(
                 float(a),
                 float(b),
@@ -510,12 +520,6 @@ def compute_stability_map(
             has_minimum[row, column] = point.has_local_minimum
             passes_threshold[row, column] = point.passes_friction_threshold
             passes_centering[row, column] = point.passes_centering_tolerance
-            forbidden[row, column] = geometry_is_forbidden(
-                float(a),
-                float(b),
-                attractor_radius=(attractor.radius if attractor is not None else 7.5 * MILLIMETRE),
-                repulsor_radius=(repulsor.radius if repulsor is not None else 5.0 * MILLIMETRE),
-            )
 
     return StabilityMap(
         order=order,

@@ -343,7 +343,7 @@ input_panel = ui.div(
             minimum=0.001,
             maximum=30,
             step=0.05,
-            note="Maximum transverse dead zone",
+            note="Maximum half-width y₁₀ of the static-friction dead zone",
         ),
         class_="input-pair",
     ),

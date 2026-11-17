@@ -128,7 +128,9 @@ The lower map limits follow directly from the fixed-magnet geometry. The
 `a` limit is taken from the collision circle at 90 degrees, measured from the
 positive `a` axis, and is therefore `a_min = 0`. This deliberately keeps the
 grey geometric-exclusion region visible in the map. The geometric `b_min` is
-the repulsor radius and is rounded down to a whole millimetre.
+the repulsor radius; the displayed lower limit is rounded down to a whole
+millimetre and shifted down by one additional millimetre. Geometrically
+excluded samples are masked before the field calculation.
 
 Run the app locally with `pixi run app` and export the static GitHub Pages
 bundle with `pixi run export-site`. All numerical work then runs in the

@@ -40,14 +40,14 @@ def test_web_inputs_reproduce_article_moment_ratio() -> None:
     assert inputs.attractor.polarity == -1
     assert inputs.repulsor.polarity == 1
     assert inputs.a_min_m / MILLIMETRE == pytest.approx(0.0)
-    assert inputs.b_min_m / MILLIMETRE == pytest.approx(5.0)
+    assert inputs.b_min_m / MILLIMETRE == pytest.approx(4.0)
 
 
 def test_map_minima_follow_geometry_and_rounding_rules() -> None:
     inputs = _inputs(attractor_radius_mm=6.2, repulsor_radius_mm=5.9)
 
     assert inputs.a_min_m / MILLIMETRE == pytest.approx(0.0)
-    assert inputs.b_min_m / MILLIMETRE == pytest.approx(5.0)
+    assert inputs.b_min_m / MILLIMETRE == pytest.approx(4.0)
     assert math.hypot(inputs.a_min_m, inputs.b_min_m) < (
         inputs.attractor_radius_m + inputs.repulsor_radius_m
     )
@@ -89,6 +89,8 @@ def test_small_web_calculation_reuses_dipole_result_for_order_zero() -> None:
         calculation.dipole_map.geometry_forbidden,
     )
     assert calculation.dipole_map.geometry_forbidden[:, 0].any()
+    assert calculation.dipole_map.geometry_forbidden[0, :].all()
+    assert np.isnan(calculation.dipole_map.chi[calculation.dipole_map.geometry_forbidden]).all()
 
 
 def test_web_validation_rejects_unsupported_order_and_invalid_map_limit() -> None:
