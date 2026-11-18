@@ -10,7 +10,7 @@ from tractor_magnet.adaptive_map import compute_adaptive_stability_map
 from tractor_magnet.constants import MILLIMETRE
 from tractor_magnet.materials import magnet_grade
 from tractor_magnet.models import CylinderMagnet
-from tractor_magnet.stability_map import StabilityMap, SymmetryLineFit, fit_symmetry_line
+from tractor_magnet.stability_map import StabilityMap
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +170,6 @@ class WebCalculation:
     evaluated_points: int
     full_grid_points: int
     scout_points: int
-    line_fit: SymmetryLineFit | None
     elapsed_s: float
 
 
@@ -187,14 +186,6 @@ def calculate_web(inputs: WebInputs) -> WebCalculation:
         attractor=inputs.attractor,
         repulsor=inputs.repulsor,
     )
-    try:
-        line_fit = fit_symmetry_line(
-            result.stability_map,
-            a_interval=None,
-            practical_only=True,
-        )
-    except ValueError:
-        line_fit = None
     return WebCalculation(
         inputs=inputs,
         refined_map=result.stability_map,
@@ -202,6 +193,5 @@ def calculate_web(inputs: WebInputs) -> WebCalculation:
         evaluated_points=result.evaluated_points,
         full_grid_points=result.full_grid_points,
         scout_points=result.scout_points,
-        line_fit=line_fit,
         elapsed_s=time.perf_counter() - started,
     )

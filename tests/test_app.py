@@ -44,8 +44,8 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
     assert "necessary condition" in html
     assert "m_{\\mathrm{rep}}" in html
     assert "three force barriers" in html
-    assert "Production-line fit" in html
-    assert "b(a) = m a + c" in html
+    assert "Extracted symmetry contour" in html
+    assert "no regression model is fitted" in html
     assert "Material-grade bounds" in html
     assert "supermagnete.de/physical-magnet-data" in html
 
@@ -53,8 +53,11 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
 def test_standard_output_has_only_the_chi_map() -> None:
     html = str(calculator_panel)
     assert "χ map and zero contour" in html
+    assert "Hyy − Hxx = 0 data points" in html
+    assert "points connected only as a visual guide" in html
     assert "Selected design point" not in html
     assert "geometry_diagram" not in html
+    assert "Linear fit" not in html
 
 
 def test_chi_map_uses_the_original_practical_stability_mask() -> None:

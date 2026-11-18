@@ -124,8 +124,9 @@ default). Search limits and the MPEX4 evaluation region are inferred
 automatically. If a stable point reaches the candidate boundary, the region is
 expanded before the final map is cropped around the complete stability band.
 All four magnets share one height input. The app also interpolates the
-practically stable `Hyy - Hxx = 0` contour and reports its least-squares line
-`b(a) = m a + c`, the resolved `a` interval, and the RMS fit residual.
+practically stable `Hyy - Hxx = 0` contour column by column and shows the
+resulting `b(a)` data points in a separate plot below the two-dimensional map.
+The points are connected only as a visual guide; no regression model is fitted.
 Each magnet type is assigned a ferrite or NdFeB material grade from the
 [physical magnet data published by supermagnete.de](https://www.supermagnete.de/physical-magnet-data).
 Selecting a grade resets `Br` to its range midpoint rounded to 1 mT; `Br` can

@@ -12,7 +12,7 @@ from shiny import App, Inputs, Outputs, Session, reactive, render, req, ui
 
 from tractor_magnet.constants import MILLIMETRE
 from tractor_magnet.materials import MAGNET_GRADES, magnet_grade
-from tractor_magnet.stability_map import StabilityMap
+from tractor_magnet.stability_map import StabilityMap, symmetry_line_points
 from web_support import WebCalculation, WebInputs, calculate_web
 
 APP_DIR = Path(__file__).parent
@@ -212,6 +212,41 @@ def _stability_figure(calculation: WebCalculation):
     return figure
 
 
+def _symmetry_line_figure(calculation: WebCalculation):
+    """Show the extracted practical zero-contour samples without regression."""
+
+    points = symmetry_line_points(calculation.refined_map, practical_only=True)
+    figure, axis = plt.subplots(1, 1, figsize=(7.2, 3.8))
+    if points.size:
+        a_mm = points[:, 0] / MILLIMETRE
+        b_mm = points[:, 1] / MILLIMETRE
+        axis.plot(a_mm, b_mm, color="#136f7a", linewidth=1.2, alpha=0.7)
+        axis.scatter(
+            a_mm,
+            b_mm,
+            s=30,
+            color="#ffd166",
+            edgecolor="#172033",
+            linewidth=0.7,
+            zorder=3,
+        )
+    else:
+        axis.text(
+            0.5,
+            0.5,
+            "No resolved practical zero-contour points",
+            ha="center",
+            va="center",
+            transform=axis.transAxes,
+            color="#667085",
+        )
+    axis.set(xlabel="a [mm]", ylabel="b [mm]")
+    axis.grid(color="#dfe5ec", linewidth=0.7, alpha=0.8)
+    axis.set_aspect("equal", adjustable="datalim")
+    figure.subplots_adjust(left=0.12, right=0.97, bottom=0.19, top=0.96)
+    return figure
+
+
 def _input_section(index: str, title: str) -> ui.Tag:
     return ui.div(
         ui.tags.span(index, class_="section-index"),
@@ -344,7 +379,6 @@ calculator_panel = ui.div(
     ui.tags.main(
         ui.output_ui("calculation_message"),
         ui.output_ui("summary_cards"),
-        ui.output_ui("line_fit_summary"),
         ui.div(
             ui.div(
                 ui.div(
@@ -357,6 +391,19 @@ calculator_panel = ui.div(
             ),
             ui.output_plot("stability_plot", height="470px"),
             class_="visual-card map-card",
+        ),
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.span("EXTRACTED CONTOUR", class_="eyebrow"),
+                    ui.h3("Hyy − Hxx = 0 data points"),
+                    class_="card-title-group",
+                ),
+                ui.tags.span("points connected only as a visual guide", class_="method-chip"),
+                class_="visual-card-header",
+            ),
+            ui.output_plot("symmetry_line_plot", height="330px"),
+            class_="visual-card contour-card",
         ),
         class_="calculator-results",
     ),
@@ -419,11 +466,11 @@ method_panel = ui.div(
         ),
         ui.div(
             ui.tags.span("05", class_="docs-number"),
-            ui.h3("Production-line fit"),
+            ui.h3("Extracted symmetry contour"),
             ui.tags.p(
                 "Inside the practical mask, zero crossings of Hyy − Hxx are interpolated "
-                "column by column. Their least-squares line b(a) = m a + c is reported "
-                "together with its actually resolved a interval and RMS residual."
+                "column by column and shown directly as b(a) data points below the map. "
+                "The connecting line is only a visual guide; no regression model is fitted."
             ),
             class_="docs-section",
         ),
@@ -642,52 +689,14 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         )
 
     @output
-    @render.ui
-    def line_fit_summary() -> ui.Tag:
-        value = result()
-        fit = value.line_fit
-        if fit is None:
-            return ui.div(
-                ui.tags.span("PRODUCTION LINE", class_="eyebrow"),
-                ui.h3("No resolved linear-fit interval"),
-                ui.tags.p(
-                    "The practical MPEX4 region contains fewer than two resolved "
-                    "Hyy − Hxx zero crossings. Reduce the map resolution or change the design."
-                ),
-                class_="line-fit-card line-fit-unavailable",
-            )
-        intercept_mm = fit.intercept / MILLIMETRE
-        return ui.div(
-            ui.div(
-                ui.div(
-                    ui.tags.span("PRODUCTION LINE", class_="eyebrow"),
-                    ui.h3("Linear fit of Hyy − Hxx = 0"),
-                    class_="card-title-group",
-                ),
-                ui.tags.span(f"{fit.points} contour points", class_="method-chip"),
-                class_="visual-card-header",
-            ),
-            ui.div(
-                f"b(a) = {fit.slope:.5f} a {intercept_mm:+.4f} mm",
-                class_="fit-equation",
-            ),
-            ui.div(
-                ui.tags.span(f"slope m = {fit.slope:.6f}"),
-                ui.tags.span(f"intercept c = {intercept_mm:+.4f} mm"),
-                ui.tags.span(
-                    f"fit range: {fit.a_min / MILLIMETRE:.2f} mm ≤ a ≤ "
-                    f"{fit.a_max / MILLIMETRE:.2f} mm"
-                ),
-                ui.tags.span(f"RMS residual = {fit.rms_residual / MILLIMETRE:.4f} mm"),
-                class_="fit-details",
-            ),
-            class_="line-fit-card",
-        )
-
-    @output
     @render.plot
     def stability_plot():
         return _stability_figure(result())
+
+    @output
+    @render.plot
+    def symmetry_line_plot():
+        return _symmetry_line_figure(result())
 
 
 app = App(app_ui, server, static_assets=APP_DIR / "www")

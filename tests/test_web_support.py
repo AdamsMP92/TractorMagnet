@@ -83,9 +83,6 @@ def test_web_calculation_returns_an_adaptive_mpex4_map() -> None:
 
     assert calculation.refined_map.order == 4
     assert calculation.refined_map.stable.any()
-    assert calculation.line_fit is not None
-    assert calculation.line_fit.a_min < calculation.line_fit.a_max
-    assert calculation.line_fit.points >= 2
     assert math.isfinite(calculation.elapsed_s)
     assert calculation.evaluated_points < calculation.full_grid_points
     assert calculation.search_extent_m > calculation.refined_map.a_values[-1]
