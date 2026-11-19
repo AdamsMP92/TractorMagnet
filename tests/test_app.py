@@ -1,15 +1,12 @@
-from types import SimpleNamespace
-
-import numpy as np
 from shiny import App
 
-from app import _mask_to_practical_region, app, calculator_panel, input_panel, method_panel
+from app import app, calculator_panel, input_panel, method_panel
 
 
 def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert isinstance(app, App)
     html = str(input_panel)
-    assert "Compute stability map" in html
+    assert "Compute design curve" in html
     assert "Resolution [mm]" in html
     assert "Refinement order" not in html
     assert "Grid per axis" not in html
@@ -18,13 +15,13 @@ def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert "Physical friction criterion" in html
     assert "Friction-force threshold" in html
     friction_section = html[
-        html.index("Physical friction criterion") : html.index("Compute stability map")
+        html.index("Physical friction criterion") : html.index("Compute design curve")
     ]
     assert "input-pair" not in friction_section
     assert friction_section.index("Friction-force threshold") < friction_section.index(
         "Centering tolerance"
     )
-    assert html.index("Physical friction criterion") < html.index("Compute stability map")
+    assert html.index("Physical friction criterion") < html.index("Compute design curve")
     assert "Follower Magnet" in html
     assert "Attractor Magnet" in html
     assert "Repulsor Magnet Pair" in html
@@ -46,38 +43,36 @@ def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert "derived_map_bounds" not in html
 
 
-def test_method_panel_states_necessary_condition_and_full_mask() -> None:
+def test_method_panel_states_direct_curve_search_and_full_validation() -> None:
     html = str(method_panel)
     assert "necessary condition" in html
     assert "m_{\\mathrm{rep}}" in html
     assert "three force barriers" in html
-    assert "Extracted symmetry contour" in html
+    assert "Direct MPEX4 root search" in html
+    assert "without constructing the expensive MPEX4 map" in html
     assert "no regression model is fitted" in html
     assert "Material-grade bounds" in html
     assert "supermagnete.de/physical-magnet-data" in html
 
 
-def test_standard_output_has_only_the_chi_map() -> None:
+def test_standard_output_has_only_the_design_curve() -> None:
     html = str(calculator_panel)
     assert "Meaning of a and b" in html
     assert "geometry-convention.svg" in html
     assert "The origin is the intersection of the fixed-magnet axes" in html
     assert "follower equilibrium x_eq &gt; 0" in html
-    assert "χ map and zero contour" in html
-    assert "Hyy − Hxx = 0 data points" in html
-    assert "points connected only as a visual guide" in html
+    assert "Design curve" in html
+    assert "all practical checks passed" in html
+    assert "CURVATURE SYMMETRY" not in html
+    assert "χ map and zero contour" not in html
+    assert "Hyy − Hxx = 0 data points" not in html
+    assert "stability_plot" not in html
     assert "Selected design point" not in html
     assert "geometry_diagram" not in html
     assert "Linear fit" not in html
 
 
-def test_chi_map_uses_the_original_practical_stability_mask() -> None:
-    stability_map = SimpleNamespace(
-        stable=np.asarray(((True, False), (False, True)), dtype=bool)
-    )
-    values = np.asarray(((1.0, 2.0), (np.nan, 4.0)))
-
-    visible = _mask_to_practical_region(stability_map, values)
-
-    assert visible.mask.tolist() == [[False, True], [True, False]]
-    assert visible.compressed().tolist() == [1.0, 4.0]
+def test_hero_uses_the_simple_design_message() -> None:
+    html = str(app.ui)
+    assert "Design your own tractor magnet." in html
+    assert "Explore the minimal symmetric configuration" not in html

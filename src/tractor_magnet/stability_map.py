@@ -51,6 +51,17 @@ class StabilityPoint:
 
 
 @dataclass(frozen=True, slots=True)
+class CurvaturePoint:
+    """Outer equilibrium and planar curvatures without force-barrier scans."""
+
+    equilibrium_x: float
+    curvature_x: float
+    curvature_y: float
+    curvature_difference: float
+    has_local_minimum: bool
+
+
+@dataclass(frozen=True, slots=True)
 class StabilityMap:
     """Figure-4 quantities evaluated on a rectangular ``(a, b)`` grid."""
 
@@ -176,6 +187,92 @@ def _sign_change_roots(
         if not unique or abs(root - unique[-1]) > 1.0e-10:
             unique.append(root)
     return unique
+
+
+def _minimal_model(
+    a: float,
+    b: float,
+    *,
+    order: int,
+    follower: CylinderMagnet | None,
+    attractor: CylinderMagnet | None,
+    repulsor: CylinderMagnet | None,
+) -> MultipoleExpansion:
+    custom_magnets = (follower, attractor, repulsor)
+    if any(magnet is not None for magnet in custom_magnets):
+        if not all(magnet is not None for magnet in custom_magnets):
+            raise ValueError("follower, attractor, and repulsor must be supplied together")
+        configuration = minimal_configuration(
+            a,
+            b,
+            follower=follower,
+            attractor=attractor,
+            repulsor=repulsor,
+        )
+    else:
+        configuration = article_minimal_configuration(a, b)
+    return MultipoleExpansion(configuration, order=order)
+
+
+def _outer_minimum(
+    model: MultipoleExpansion,
+    axial_interval: tuple[float, float],
+    axial_samples: int,
+) -> tuple[list[float], tuple[float, NDArray[np.float64], float] | None]:
+    x_coordinates = np.linspace(*axial_interval, axial_samples)
+    axial_force = -model.derivative_array(x_coordinates, 0.0, _DX)
+    roots = _sign_change_roots(model, x_coordinates, axial_force)
+    minima: list[tuple[float, NDArray[np.float64], float]] = []
+    for root in roots:
+        hessian = model.hessian((root, 0.0))
+        if np.all(np.linalg.eigvalsh(hessian) > 0.0):
+            minima.append((root, hessian, model.energy((root, 0.0))))
+    return roots, max(minima, key=lambda item: item[0]) if minima else None
+
+
+def evaluate_curvature_point(
+    a: float,
+    b: float,
+    *,
+    order: int,
+    axial_interval: tuple[float, float] = (0.1e-3, 80.0e-3),
+    axial_samples: int = 241,
+    follower: CylinderMagnet | None = None,
+    attractor: CylinderMagnet | None = None,
+    repulsor: CylinderMagnet | None = None,
+) -> CurvaturePoint:
+    """Evaluate only the outer equilibrium and its planar Hessian.
+
+    This is the inexpensive primitive used to locate ``Hyy - Hxx = 0`` before
+    the complete force-barrier and centering checks are applied.
+    """
+
+    if a < 0.0 or b <= 0.0:
+        raise ValueError("a must be non-negative and b must be positive")
+    if axial_samples < 3:
+        raise ValueError("axial_samples must be at least three")
+    model = _minimal_model(
+        a,
+        b,
+        order=order,
+        follower=follower,
+        attractor=attractor,
+        repulsor=repulsor,
+    )
+    _, minimum = _outer_minimum(model, axial_interval, axial_samples)
+    if minimum is None:
+        nan = float("nan")
+        return CurvaturePoint(nan, nan, nan, nan, False)
+    equilibrium_x, hessian, _ = minimum
+    curvature_x = float(hessian[0, 0])
+    curvature_y = float(hessian[1, 1])
+    return CurvaturePoint(
+        equilibrium_x=equilibrium_x,
+        curvature_x=curvature_x,
+        curvature_y=curvature_y,
+        curvature_difference=curvature_y - curvature_x,
+        has_local_minimum=True,
+    )
 
 
 def _force_barriers(
@@ -332,20 +429,15 @@ def evaluate_stability_point(
     if axial_samples < 3 or barrier_samples < 3:
         raise ValueError("sample counts must be at least three")
 
-    custom_magnets = (follower, attractor, repulsor)
-    if any(magnet is not None for magnet in custom_magnets):
-        if not all(magnet is not None for magnet in custom_magnets):
-            raise ValueError("follower, attractor, and repulsor must be supplied together")
-        configuration = minimal_configuration(
-            a,
-            b,
-            follower=follower,
-            attractor=attractor,
-            repulsor=repulsor,
-        )
-    else:
-        configuration = article_minimal_configuration(a, b)
-    model = MultipoleExpansion(configuration, order=order)
+    model = _minimal_model(
+        a,
+        b,
+        order=order,
+        follower=follower,
+        attractor=attractor,
+        repulsor=repulsor,
+    )
+    configuration = model.configuration
     repulsor_radius = configuration.sources[1].magnet.radius
     selected_half_span = (
         b + repulsor_radius if transverse_half_span is None else transverse_half_span
@@ -357,17 +449,8 @@ def evaluate_stability_point(
         raise ValueError("transverse_half_span must be positive")
     if selected_centering_tolerance <= 0.0:
         raise ValueError("centering_tolerance must be positive")
-    x_coordinates = np.linspace(*axial_interval, axial_samples)
-    axial_force = -model.derivative_array(x_coordinates, 0.0, _DX)
-    roots = _sign_change_roots(model, x_coordinates, axial_force)
-
-    minima: list[tuple[float, NDArray[np.float64], float]] = []
-    for root in roots:
-        hessian = model.hessian((root, 0.0))
-        if np.all(np.linalg.eigvalsh(hessian) > 0.0):
-            minima.append((root, hessian, model.energy((root, 0.0))))
-
-    if not minima:
+    roots, minimum = _outer_minimum(model, axial_interval, axial_samples)
+    if minimum is None:
         nan = float("nan")
         return StabilityPoint(
             equilibrium_x=nan,
@@ -393,7 +476,7 @@ def evaluate_stability_point(
             passes_centering_tolerance=False,
         )
 
-    equilibrium_x, hessian, energy = max(minima, key=lambda item: item[0])
+    equilibrium_x, hessian, energy = minimum
     roots_to_left = [root for root in roots if root < equilibrium_x - 1.0e-10]
     preceding_root = max(roots_to_left, default=axial_interval[0])
     barriers = _force_barriers(

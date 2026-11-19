@@ -78,34 +78,66 @@ def test_custom_minimal_configuration_and_overlap_rule() -> None:
     )
 
 
-def test_web_calculation_returns_an_adaptive_mpex4_map() -> None:
+def test_web_calculation_returns_a_direct_validated_mpex4_curve() -> None:
     calculation = calculate_web(_inputs())
 
-    assert calculation.refined_map.order == 4
-    assert calculation.refined_map.stable.any()
+    curve = calculation.design_curve
+    assert curve.order == 4
+    assert curve.a_values.size > 2
+    assert curve.a_values.shape == curve.b_values.shape == curve.equilibrium_x.shape
     assert math.isfinite(calculation.elapsed_s)
-    assert calculation.evaluated_points < calculation.full_grid_points
-    assert calculation.search_extent_m > calculation.refined_map.a_values[-1]
-    assert calculation.refined_map.geometry_forbidden[:, 0].any()
-    assert np.isnan(
-        calculation.refined_map.chi[calculation.refined_map.geometry_forbidden]
-    ).all()
+    assert curve.search_extent > curve.a_values[-1]
+    assert curve.mpex4_curvature_evaluations > curve.a_values.size
+    assert curve.full_validity_evaluations < curve.mpex4_curvature_evaluations
+    assert all(
+        not geometry_is_forbidden(
+            float(a),
+            float(b),
+            attractor_radius=calculation.inputs.attractor.radius,
+            repulsor_radius=calculation.inputs.repulsor.radius,
+        )
+        for a, b in curve.points
+    )
 
     reference = np.load(
         Path(__file__).parents[1]
         / "results/figure_4_stability_maps/figure_4_theory_mpex4.npz"
     )
-    reference_stable = (
+    stable = (
         reference["has_local_minimum"]
         & reference["passes_friction_threshold"]
         & reference["passes_centering_tolerance"]
         & ~reference["geometry_forbidden"]
-    )[::10, ::10]
-    a_indices = np.rint(reference["a_values"][::10] / MILLIMETRE).astype(int)
-    b_indices = np.rint(reference["b_values"][::10] / MILLIMETRE - 4.0).astype(int)
-    adaptive_stable = calculation.refined_map.stable[np.ix_(b_indices, a_indices)]
+    )
+    differences = reference["curvature_difference"]
+    reference_a = reference["a_values"]
+    reference_b = reference["b_values"]
+    reference_roots: dict[float, float] = {}
+    for a in curve.a_values:
+        column = int(np.argmin(abs(reference_a - a)))
+        roots: list[float] = []
+        for row in range(reference_b.size - 1):
+            if not stable[row, column] or not stable[row + 1, column]:
+                continue
+            lower = differences[row, column]
+            upper = differences[row + 1, column]
+            if lower == 0.0:
+                roots.append(float(reference_b[row]))
+            elif np.signbit(lower) != np.signbit(upper):
+                fraction = abs(lower) / (abs(lower) + abs(upper))
+                roots.append(
+                    float(reference_b[row] + fraction * (reference_b[row + 1] - reference_b[row]))
+                )
+        if roots:
+            reference_roots[round(float(a), 12)] = max(roots)
 
-    assert np.array_equal(adaptive_stable, reference_stable)
+    common = [
+        abs(float(b) - reference_roots[round(float(a), 12)])
+        for a, b in curve.points
+        if round(float(a), 12) in reference_roots
+    ]
+    assert len(common) >= 3
+    assert max(common) < 0.1 * MILLIMETRE
 
 
 def test_web_validation_rejects_excessive_or_nonpositive_resolution() -> None:

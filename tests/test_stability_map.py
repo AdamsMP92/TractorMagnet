@@ -6,6 +6,7 @@ import pytest
 from tractor_magnet.constants import MILLIMETRE
 from tractor_magnet.stability_map import (
     compute_stability_map,
+    evaluate_curvature_point,
     evaluate_stability_point,
     geometry_is_forbidden,
 )
@@ -36,6 +37,25 @@ def test_mpex0_reference_geometry_has_expected_figure_4_quantities() -> None:
     assert point.centering_tolerance / MILLIMETRE == pytest.approx(1.25)
     assert point.passes_centering_tolerance
     assert point.chi == pytest.approx(math.log10(abs(point.curvature_y - point.curvature_x)))
+
+
+def test_curvature_only_evaluation_matches_complete_stability_point() -> None:
+    curvature = evaluate_curvature_point(
+        14.0 * MILLIMETRE,
+        12.0 * MILLIMETRE,
+        order=4,
+    )
+    complete = evaluate_stability_point(
+        14.0 * MILLIMETRE,
+        12.0 * MILLIMETRE,
+        order=4,
+    )
+
+    assert curvature.has_local_minimum
+    assert curvature.equilibrium_x == pytest.approx(complete.equilibrium_x)
+    assert curvature.curvature_x == pytest.approx(complete.curvature_x)
+    assert curvature.curvature_y == pytest.approx(complete.curvature_y)
+    assert curvature.curvature_difference == pytest.approx(complete.curvature_difference)
 
 
 def test_axial_barrier_scan_stops_at_first_follower_contact() -> None:

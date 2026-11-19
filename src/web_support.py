@@ -6,11 +6,10 @@ import math
 import time
 from dataclasses import dataclass
 
-from tractor_magnet.adaptive_map import compute_adaptive_stability_map
 from tractor_magnet.constants import MILLIMETRE
+from tractor_magnet.design_curve import DesignCurveResult, compute_design_curve
 from tractor_magnet.materials import magnet_grade
 from tractor_magnet.models import CylinderMagnet
-from tractor_magnet.stability_map import StabilityMap
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,23 +161,19 @@ class WebInputs:
 
 @dataclass(frozen=True, slots=True)
 class WebCalculation:
-    """Adaptive MPEX4 result retained by the browser."""
+    """Directly traced and validated MPEX4 design curve retained by the browser."""
 
     inputs: WebInputs
-    refined_map: StabilityMap
-    search_extent_m: float
-    evaluated_points: int
-    full_grid_points: int
-    scout_points: int
+    design_curve: DesignCurveResult
     elapsed_s: float
 
 
 def calculate_web(inputs: WebInputs) -> WebCalculation:
-    """Run the automatic MPEX0 scout and sparse MPEX4 refinement."""
+    """Trace the curvature-balance curve and validate only its MPEX4 roots."""
 
     inputs.validate()
     started = time.perf_counter()
-    result = compute_adaptive_stability_map(
+    result = compute_design_curve(
         inputs.resolution_m,
         friction_threshold=inputs.friction_threshold_n,
         centering_tolerance=inputs.centering_tolerance_m,
@@ -188,10 +183,6 @@ def calculate_web(inputs: WebInputs) -> WebCalculation:
     )
     return WebCalculation(
         inputs=inputs,
-        refined_map=result.stability_map,
-        search_extent_m=result.search_extent,
-        evaluated_points=result.evaluated_points,
-        full_grid_points=result.full_grid_points,
-        scout_points=result.scout_points,
+        design_curve=result,
         elapsed_s=time.perf_counter() - started,
     )

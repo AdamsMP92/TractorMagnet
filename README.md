@@ -35,6 +35,7 @@ The Python package lives in `src/tractor_magnet`. Its public inputs use SI units
 - `multipole.py`: general even-order MPEX-N interaction model
 - `equilibrium.py`: axial root search and planar stability classification
 - `stability_map.py`: Fig. 4 force barriers, friction mask, and symmetry measure
+- `design_curve.py`: direct, pointwise validated MPEX4 curvature-balance curve
 - `configurations.py`: parameter sets used in the article
 - `reproduction.py`: datasets for article figure reproductions
 
@@ -112,43 +113,31 @@ The deployed app is available at
 
 The browser-native Shiny interface follows the same deployment pattern as the
 other scientific apps at <https://adamsmp92.github.io/homepage/software/>. It
-provides an adaptive design analysis for arbitrary cylindrical follower,
+provides a direct design-curve analysis for arbitrary cylindrical follower,
 attractor, and repulsor magnets:
 
 1. the necessary point-dipole moment condition,
-2. an automatically expanding MPEX0 scout,
-3. a sparse exact-cylinder MPEX4 refinement of the candidate band.
+2. an automatically expanding, curvature-only MPEX0 scout,
+3. a direct exact-cylinder MPEX4 root search for `Hyy - Hxx = 0`,
+4. complete practical validation at every root.
 
-The only numerical map input is the final spatial resolution (0.2 mm by
-default). Search limits and the MPEX4 evaluation region are inferred
-automatically. If a stable point reaches the candidate boundary, the region is
-expanded before the final map is cropped around the complete stability band.
-All four magnets share one height input. The app also interpolates the
-practically stable `Hyy - Hxx = 0` contour column by column and shows the
-resulting `b(a)` data points in a separate plot below the two-dimensional map.
-The points are connected only as a visual guide; no regression model is fitted.
+The only numerical search input is the final spacing in `a` (0.2 mm by
+default); all search limits are inferred automatically. Instead of evaluating
+a two-dimensional MPEX4 map, the solver traces the balance directly as `b(a)`.
+The expensive force-barrier and centering calculations therefore run only at
+the roots. All four magnets share one height input. The validated points are
+shown as a single design curve; no regression model is fitted.
 Each magnet type is assigned a ferrite or NdFeB material grade from the
 [physical magnet data published by supermagnete.de](https://www.supermagnete.de/physical-magnet-data).
 Selecting a grade resets `Br` to its range midpoint rounded to 1 mT; `Br` can
 then be adjusted in 1 mT increments within that grade's room-temperature
 remanence interval.
 
-The displayed practical-stability boundary retains the complete scientific
-core: fixed-magnet overlap exclusion, a positive planar Hessian, all three
-force-barrier thresholds, and transverse centering tolerance. The `chi` map is
-therefore not presented as a stand-alone stability test. As in the original
-Figure-4 reproduction, both the colored `chi` values and the zero contour are
-clipped to this practical-stability region.
-
-The lower map limits follow directly from the fixed-magnet geometry. The
-`a` limit is taken from the collision circle at 90 degrees, measured from the
-positive `a` axis, and is therefore `a_min = 0`. This deliberately keeps the
-grey geometric-exclusion region visible in the map. The geometric `b_min` is
-the repulsor radius; the displayed lower limit is rounded down to a whole
-millimetre and shifted down by one additional millimetre. Geometrically
-excluded samples are masked before the field calculation.
-The grey overlap region is drawn from the analytical circle and line
-boundaries, so its visual resolution is independent of the numerical map grid.
+Every displayed point retains the complete scientific core: fixed-magnet
+overlap exclusion, an exterior follower equilibrium, a positive planar
+Hessian, all three force-barrier thresholds, collision-limited scan paths, and
+the transverse centering tolerance. The original two-dimensional Figure-4 map
+pipeline remains available in the package for scientific reproduction work.
 
 Run the app locally with `pixi run app` and export the static GitHub Pages
 bundle with `pixi run export-site`. All numerical work then runs in the
