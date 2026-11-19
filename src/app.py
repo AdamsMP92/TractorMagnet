@@ -333,26 +333,23 @@ input_panel = ui.div(
         note="Selected-grade range · 1 mT steps · same polarity as follower",
     ),
     _input_section("05", "Physical friction criterion"),
-    ui.div(
-        _field(
-            "friction",
-            "Friction-force threshold [mN]",
-            10.0,
-            minimum=0.001,
-            maximum=1000,
-            step=1.0,
-            note="Physical static-friction scale",
-        ),
-        _field(
-            "centering",
-            "Centering tolerance [mm]",
-            1.25,
-            minimum=0.001,
-            maximum=30,
-            step=0.05,
-            note="Maximum half-width y₁₀ of the static-friction dead zone",
-        ),
-        class_="input-pair",
+    _field(
+        "friction",
+        "Friction-force threshold [mN]",
+        10.0,
+        minimum=0.001,
+        maximum=1000,
+        step=1.0,
+        note="Physical static-friction scale",
+    ),
+    _field(
+        "centering",
+        "Centering tolerance [mm]",
+        1.25,
+        minimum=0.001,
+        maximum=30,
+        step=0.05,
+        note="Maximum half-width y₁₀ of the static-friction dead zone",
     ),
     _input_section("06", "Compute stability map"),
     _field(
@@ -377,6 +374,32 @@ input_panel = ui.div(
 calculator_panel = ui.div(
     ui.div(input_panel, class_="calculator-sidebar"),
     ui.tags.main(
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.span("GEOMETRY CONVENTION", class_="eyebrow"),
+                    ui.h3("Meaning of a and b"),
+                    class_="card-title-group",
+                ),
+                ui.tags.span("schematic · not to scale", class_="method-chip"),
+                class_="visual-card-header",
+            ),
+            ui.tags.img(
+                src="geometry-convention.svg",
+                alt=(
+                    "Plan-view geometry with the attractor at minus a, two repulsors at "
+                    "plus and minus b, and the movable follower at its positive x equilibrium"
+                ),
+                class_="geometry-convention-image",
+            ),
+            ui.tags.p(
+                "The origin is the intersection of the fixed-magnet axes. The attractor "
+                "is fixed at (-a, 0), the repulsor pair at (0, ±b), and the movable "
+                "follower equilibrium x_eq > 0 is determined by the field model.",
+                class_="geometry-caption",
+            ),
+            class_="visual-card geometry-convention-card",
+        ),
         ui.output_ui("calculation_message"),
         ui.output_ui("summary_cards"),
         ui.div(

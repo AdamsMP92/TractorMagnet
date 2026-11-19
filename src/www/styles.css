@@ -142,6 +142,8 @@ a { color: var(--teal); }
 .visual-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .card-title-group h3, .source-card h3 { margin-bottom: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -.015em; }
 .method-chip { padding: 5px 9px; border: 1px solid #c9dde1; border-radius: 999px; color: var(--teal); background: #f2f9f9; font-size: .65rem; font-weight: 700; }
+.geometry-convention-image { display: block; width: 100%; height: auto; margin: 14px 0 10px; }
+.geometry-caption { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.55; }
 
 .documentation-panel { max-width: 1180px; margin: 0 auto; padding: 10px 0 12px; }
 .docs-intro { max-width: 860px; margin-bottom: 22px; }

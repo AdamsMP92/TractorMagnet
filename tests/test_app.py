@@ -17,6 +17,13 @@ def test_shiny_app_exposes_only_the_adaptive_resolution_control() -> None:
     assert "b max [mm]" not in html
     assert "Physical friction criterion" in html
     assert "Friction-force threshold" in html
+    friction_section = html[
+        html.index("Physical friction criterion") : html.index("Compute stability map")
+    ]
+    assert "input-pair" not in friction_section
+    assert friction_section.index("Friction-force threshold") < friction_section.index(
+        "Centering tolerance"
+    )
     assert html.index("Physical friction criterion") < html.index("Compute stability map")
     assert "Follower Magnet" in html
     assert "Attractor Magnet" in html
@@ -52,6 +59,10 @@ def test_method_panel_states_necessary_condition_and_full_mask() -> None:
 
 def test_standard_output_has_only_the_chi_map() -> None:
     html = str(calculator_panel)
+    assert "Meaning of a and b" in html
+    assert "geometry-convention.svg" in html
+    assert "The origin is the intersection of the fixed-magnet axes" in html
+    assert "follower equilibrium x_eq &gt; 0" in html
     assert "χ map and zero contour" in html
     assert "Hyy − Hxx = 0 data points" in html
     assert "points connected only as a visual guide" in html
